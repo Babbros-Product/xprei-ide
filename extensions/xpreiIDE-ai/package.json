@@ -39,8 +39,16 @@
         "title": "xpreiIDE: Select Model"
       },
       {
+        "command": "xpreiIDE.selectEmbedModel",
+        "title": "xpreiIDE: Select Embedding Model"
+      },
+      {
         "command": "xpreiIDE.setApiKey",
         "title": "xpreiIDE: Set Provider API Key"
+      },
+      {
+        "command": "xpreiIDE.rebuildIndex",
+        "title": "xpreiIDE: Rebuild Codebase Index"
       }
     ],
     "configuration": {
@@ -72,7 +80,12 @@
         "xpreiIDE.activeModel": {
           "type": "string",
           "default": "",
-          "description": "Currently selected model, formatted 'providerId::modelName'. Set via 'xpreiIDE: Select Model'."
+          "description": "Currently selected chat model, formatted 'providerId::modelName'. Set via 'xpreiIDE: Select Model'."
+        },
+        "xpreiIDE.embedModel": {
+          "type": "string",
+          "default": "",
+          "description": "Embedding model for the codebase index, formatted 'providerId::modelName' (e.g. 'ollama-local::nomic-embed-text'). Set via 'xpreiIDE: Select Embedding Model'."
         }
       }
     }
@@ -82,7 +95,7 @@
     "watch": "npm run compile -- --sourcemap --watch",
     "vscode:prepublish": "npm run compile -- --minify",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts"
+    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

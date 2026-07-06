@@ -2,6 +2,8 @@
 // user messages to the active provider's streaming API.
 
 import * as vscode from "vscode";
+import { ContextEngine } from "../../context/contextEngine";
+import { parseMentions } from "../../context/mentions";
 import { ChatMessage, isAbortError } from "../../providers/provider";
 import { ProviderRegistry } from "../../providers/registry";
 
@@ -18,6 +20,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly registry: ProviderRegistry,
+    private readonly context: ContextEngine,
   ) {}
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -66,10 +69,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     this.history.push({ role: "user", content: trimmed });
+
+    // Resolve @codebase / @file mentions into a context block. Failures here
+    // (e.g. embed model unset) degrade gracefully to a plain chat.
+    let contextBlock = "";
+    try {
+      contextBlock = await this.context.buildContext(parseMentions(trimmed));
+    } catch (err) {
+      this.post({ type: "info", text: `Context skipped: ${errText(err)}` });
+    }
+
     this.post({ type: "start" });
 
     const messages: ChatMessage[] = [
       { role: "system", content: SYSTEM_PROMPT },
+      ...(contextBlock ? [{ role: "system" as const, content: contextBlock }] : []),
       ...this.history,
     ];
 
@@ -141,6 +155,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 </body>
 </html>`;
   }
+}
+
+function errText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function getNonce(): string {

@@ -1,34 +1,58 @@
 // Extension entry point. Wires the chat view and model/key management commands.
 
 import * as vscode from "vscode";
+import { ContextEngine } from "./context/contextEngine";
 import { ProviderConfig } from "./providers/provider";
 import { ProviderRegistry } from "./providers/registry";
 import { ChatViewProvider } from "./ui/chat/chatView";
 
 export function activate(context: vscode.ExtensionContext): void {
   const registry = new ProviderRegistry(context.secrets);
+  const log = vscode.window.createOutputChannel("xpreiIDE");
+  const engine = new ContextEngine(registry, context.storageUri, log);
 
-  const chat = new ChatViewProvider(context.extensionUri, registry);
+  const chat = new ChatViewProvider(context.extensionUri, registry, engine);
+
+  // Keep the index fresh as the user edits.
+  const watcher = vscode.workspace.createFileSystemWatcher("**/*");
+  watcher.onDidCreate((uri) => void engine.updateFile(uri));
+  watcher.onDidChange((uri) => void engine.updateFile(uri));
+  watcher.onDidDelete((uri) => void engine.removeFile(uri));
+
   context.subscriptions.push(
+    log,
+    watcher,
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, chat, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.commands.registerCommand("xpreiIDE.selectModel", () =>
-      selectModel(registry),
+      selectModel(registry, "activeModel", "chat"),
+    ),
+    vscode.commands.registerCommand("xpreiIDE.selectEmbedModel", () =>
+      selectModel(registry, "embedModel", "embedding"),
     ),
     vscode.commands.registerCommand("xpreiIDE.setApiKey", () =>
       setApiKey(registry),
     ),
+    vscode.commands.registerCommand("xpreiIDE.rebuildIndex", () =>
+      rebuildIndex(engine),
+    ),
   );
+
+  void engine.load();
 }
 
 export function deactivate(): void {
   /* no-op */
 }
 
-// Two-step QuickPick: choose a provider, then a model it reports. The choice is
-// persisted to xpreiIDE.activeModel as "providerId::model".
-async function selectModel(registry: ProviderRegistry): Promise<void> {
+// Two-step QuickPick: choose a provider, then a model it reports. Persisted to
+// the given setting ("activeModel" or "embedModel") as "providerId::model".
+async function selectModel(
+  registry: ProviderRegistry,
+  setting: "activeModel" | "embedModel",
+  role: string,
+): Promise<void> {
   const configs = registry.getConfigs();
   if (configs.length === 0) {
     vscode.window.showWarningMessage(
@@ -37,7 +61,7 @@ async function selectModel(registry: ProviderRegistry): Promise<void> {
     return;
   }
 
-  const pickedProvider = await pickProvider(configs, "Select a provider");
+  const pickedProvider = await pickProvider(configs, `Select a provider for ${role}`);
   if (!pickedProvider) return;
 
   let models: string[];
@@ -61,17 +85,40 @@ async function selectModel(registry: ProviderRegistry): Promise<void> {
     return;
   }
 
-  const model = await vscode.window.showQuickPick(models, { placeHolder: "Select a model" });
+  const model = await vscode.window.showQuickPick(models, {
+    placeHolder: `Select a ${role} model`,
+  });
   if (!model) return;
 
   await vscode.workspace
     .getConfiguration("xpreiIDE")
     .update(
-      "activeModel",
+      setting,
       ProviderRegistry.formatActive(pickedProvider.id, model),
       vscode.ConfigurationTarget.Global,
     );
-  vscode.window.showInformationMessage(`xpreiIDE model: ${pickedProvider.label} / ${model}`);
+  vscode.window.showInformationMessage(
+    `xpreiIDE ${role} model: ${pickedProvider.label} / ${model}`,
+  );
+}
+
+// Full workspace (re)index with progress + cancellation.
+async function rebuildIndex(engine: ContextEngine): Promise<void> {
+  try {
+    const count = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "xpreiIDE: indexing workspace…",
+        cancellable: true,
+      },
+      (_p, token) => engine.rebuild(token),
+    );
+    vscode.window.showInformationMessage(`xpreiIDE indexed ${count} chunks.`);
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : "Indexing failed.",
+    );
+  }
 }
 
 // Store an API key in SecretStorage for an OpenAI-compatible provider.

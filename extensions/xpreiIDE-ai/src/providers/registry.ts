@@ -37,19 +37,36 @@ export class ProviderRegistry {
 
   // Parse the "providerId::model" pointer stored in xpreiIDE.activeModel.
   async resolveActive(): Promise<ResolvedModel | undefined> {
-    const active = vscode.workspace
+    return this.resolvePointer("activeModel");
+  }
+
+  // Resolve the embedding model (xpreiIDE.embedModel) for the RAG index.
+  async resolveEmbed(): Promise<ResolvedModel | undefined> {
+    return this.resolvePointer("embedModel");
+  }
+
+  private async resolvePointer(setting: string): Promise<ResolvedModel | undefined> {
+    const pointer = vscode.workspace
       .getConfiguration("xpreiIDE")
-      .get<string>("activeModel", "");
-    const sep = active.indexOf("::");
-    if (sep < 0) return undefined;
-    const providerId = active.slice(0, sep);
-    const model = active.slice(sep + 2); // model names may themselves contain "::"
-    const cfg = this.getConfigs().find((c) => c.id === providerId);
-    if (!cfg || !model) return undefined;
-    return { provider: await this.build(cfg), model };
+      .get<string>(setting, "");
+    const parsed = ProviderRegistry.parsePointer(pointer);
+    if (!parsed) return undefined;
+    const cfg = this.getConfigs().find((c) => c.id === parsed.providerId);
+    if (!cfg) return undefined;
+    return { provider: await this.build(cfg), model: parsed.model };
   }
 
   static formatActive(providerId: string, model: string): string {
     return `${providerId}::${model}`;
+  }
+
+  // "providerId::model" → parts. Model names may themselves contain "::".
+  static parsePointer(pointer: string): { providerId: string; model: string } | undefined {
+    const sep = pointer.indexOf("::");
+    if (sep < 0) return undefined;
+    const providerId = pointer.slice(0, sep);
+    const model = pointer.slice(sep + 2);
+    if (!providerId || !model) return undefined;
+    return { providerId, model };
   }
 }

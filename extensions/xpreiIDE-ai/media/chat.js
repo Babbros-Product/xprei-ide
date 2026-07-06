@@ -62,6 +62,9 @@
       case "restore":
         addMessage(msg.role, msg.text);
         break;
+      case "info":
+        addMessage("info", msg.text);
+        break;
       case "start":
         streamingEl = addMessage("assistant", "");
         break;
