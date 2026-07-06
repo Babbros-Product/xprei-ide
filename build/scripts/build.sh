@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# xpreiIDE branded-distro build driver (macOS/Linux). See build.ps1 for Windows.
+#
+# Prereqs: git, node 20.x, python3, yarn, and platform build tools
+# (build-essential + libx11-dev etc. on Linux; Xcode CLT on macOS).
+#
+#   build/scripts/build.sh                 # full build
+#   VSCODE_TAG=1.90.2 build/scripts/build.sh
+set -euo pipefail
+
+VSCODE_TAG="${VSCODE_TAG:-1.90.2}"
+repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
+vscode_dir="$repo_root/build/vscode"
+ext_dir="$repo_root/extensions/xpreiIDE-ai"
+
+case "$(uname -s)" in
+  Darwin) target="vscode-darwin-$(uname -m | sed 's/x86_64/x64/;s/arm64/arm64/')"; out="$repo_root/build/VSCode-darwin" ;;
+  Linux)  target="vscode-linux-x64"; out="$repo_root/build/VSCode-linux-x64" ;;
+  *) echo "Unsupported OS"; exit 1 ;;
+esac
+
+step() { printf '\n=== %s ===\n' "$1"; }
+
+step "Cloning microsoft/vscode @ $VSCODE_TAG"
+rm -rf "$vscode_dir"
+git clone --depth 1 --branch "$VSCODE_TAG" https://github.com/microsoft/vscode.git "$vscode_dir"
+
+step "Applying xpreiIDE branding"
+node "$repo_root/build/scripts/patch-product.mjs" "$vscode_dir"
+
+step "Building xpreiIDE-ai extension"
+( cd "$ext_dir" && { [ -d node_modules ] || npm install; } && npm run compile -- --minify )
+
+step "yarn install (VS Code) — slow, native deps"
+( cd "$vscode_dir" && yarn && yarn gulp "$target" )
+
+step "Staging xpreiIDE-ai as a built-in"
+node "$repo_root/build/scripts/stage-extension.mjs" "$out"
+
+echo
+echo "Done. App: $out"

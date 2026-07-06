@@ -4,3 +4,8 @@ out/
 *.vsix
 *.log
 .DS_Store
+
+# P0 branded-distro build — generated, huge, never committed
+build/vscode/
+build/VSCode-*/
+

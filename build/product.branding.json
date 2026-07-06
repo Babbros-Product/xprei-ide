@@ -1,0 +1,28 @@
+{
+  "nameShort": "xpreiIDE",
+  "nameLong": "xpreiIDE",
+  "applicationName": "xpreiide",
+  "serverApplicationName": "xpreiide-server",
+  "serverDataFolderName": ".xpreiide-server",
+  "dataFolderName": ".xpreiide",
+  "win32MutexName": "xpreiide",
+  "win32DirName": "xpreiIDE",
+  "win32NameVersion": "xpreiIDE",
+  "win32RegValueName": "xpreiIDE",
+  "win32AppUserModelId": "xpreiIDE.xpreiIDE",
+  "win32ShellNameShort": "xpreiIDE",
+  "win32TunnelServiceMutex": "xpreiide-tunnelservice",
+  "win32TunnelMutex": "xpreiide-tunnel",
+  "darwinBundleIdentifier": "com.xpreiide.xpreiIDE",
+  "linuxIconName": "xpreiide",
+  "urlProtocol": "xpreiide",
+  "quality": "stable",
+  "reportIssueUrl": "https://github.com/xpreiIDE/xpreiIDE/issues/new",
+  "extensionsGallery": {
+    "serviceUrl": "https://open-vsx.org/vscode/gallery",
+    "itemUrl": "https://open-vsx.org/vscode/item",
+    "resourceUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}",
+    "controlUrl": "",
+    "recommendationsUrl": ""
+  }
+}
