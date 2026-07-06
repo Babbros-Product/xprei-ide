@@ -29,10 +29,12 @@ step "Applying xpreiIDE branding"
 node "$repo_root/build/scripts/patch-product.mjs" "$vscode_dir"
 
 step "Building xpreiIDE-ai extension"
-( cd "$ext_dir" && { [ -d node_modules ] || npm install; } && npm run compile -- --minify )
+[ -d "$ext_dir/node_modules" ] || npm install --prefix "$ext_dir"
+npm run compile --prefix "$ext_dir" -- --minify
 
 step "yarn install (VS Code) — slow, native deps"
-( cd "$vscode_dir" && yarn && yarn gulp "$target" )
+yarn --cwd "$vscode_dir"
+yarn --cwd "$vscode_dir" gulp "$target"
 
 step "Staging xpreiIDE-ai as a built-in"
 node "$repo_root/build/scripts/stage-extension.mjs" "$out"

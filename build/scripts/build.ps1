@@ -37,20 +37,18 @@ if (-not $StageOnly) {
   Step "Applying xpreiIDE branding"
   node (Join-Path $PSScriptRoot "patch-product.mjs") $vscodeDir
 
-  # 3. Build the extension bundle.
+  # 3. Build the extension bundle. --prefix pins the working dir explicitly
+  # instead of relying on Push-Location surviving into child processes.
   Step "Building xpreiIDE-ai extension"
-  Push-Location $extDir
-  if (-not (Test-Path "node_modules")) { npm install }
-  npm run compile -- --minify
-  Pop-Location
+  if (-not (Test-Path (Join-Path $extDir "node_modules"))) { npm install --prefix $extDir }
+  npm run compile --prefix $extDir -- --minify
 
-  # 4. Install VS Code build deps + compile the product.
+  # 4. Install VS Code build deps + compile the product. --cwd is yarn's
+  # equivalent explicit pin (avoids ambient-cwd reliance across processes).
   Step "yarn install (VS Code) — slow, native deps"
-  Push-Location $vscodeDir
-  yarn
+  yarn --cwd $vscodeDir
   Step "gulp vscode-win32-$Arch — slow"
-  yarn gulp "vscode-win32-$Arch"
-  Pop-Location
+  yarn --cwd $vscodeDir gulp "vscode-win32-$Arch"
 }
 
 # 5. Stage the extension into the built app as a built-in.
