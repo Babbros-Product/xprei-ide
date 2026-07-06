@@ -46,7 +46,21 @@ the API version segment (e.g. `/v1`).
 | OpenAI-compat adapter (SSE) | `src/providers/openai-compat.ts` |
 | Registry + secrets | `src/providers/registry.ts` |
 | Chat sidebar | `src/ui/chat/chatView.ts`, `media/chat.*` |
+| Context / RAG index | `src/context/*.ts` |
+| Inline (Cmd-K) edit | `src/edit/*.ts` |
 | Activation + commands | `src/extension.ts` |
 
-Next phases (see the architecture plan): P2 context/RAG, P3 Cmd-K inline edit,
-P4 agent loop.
+## Codebase context (@mentions)
+
+Set an embedding model (**xpreiIDE: Select Embedding Model**, e.g.
+`ollama-local::nomic-embed-text`), run **xpreiIDE: Rebuild Codebase Index**, then
+in chat use `@codebase <question>` for semantic retrieval or `@file:src/x.ts` to
+inline a specific file. The index updates as you edit.
+
+## Inline edit (Cmd-K)
+
+Select code, press **Cmd-K** (Ctrl-K on Windows/Linux), type an instruction. The
+model's rewrite appears as an inline red(old)/green(new) diff — **Enter** accepts,
+**Esc** rejects.
+
+Next phase (see the architecture plan): P4 agent loop.

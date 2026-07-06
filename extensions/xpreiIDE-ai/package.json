@@ -49,6 +49,36 @@
       {
         "command": "xpreiIDE.rebuildIndex",
         "title": "xpreiIDE: Rebuild Codebase Index"
+      },
+      {
+        "command": "xpreiIDE.inlineEdit",
+        "title": "xpreiIDE: Edit Selection (Inline)"
+      },
+      {
+        "command": "xpreiIDE.inlineEdit.accept",
+        "title": "xpreiIDE: Accept Inline Edit"
+      },
+      {
+        "command": "xpreiIDE.inlineEdit.reject",
+        "title": "xpreiIDE: Reject Inline Edit"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "xpreiIDE.inlineEdit",
+        "key": "ctrl+k",
+        "mac": "cmd+k",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "xpreiIDE.inlineEdit.accept",
+        "key": "enter",
+        "when": "editorTextFocus && xpreiIDE.inlineEditActive"
+      },
+      {
+        "command": "xpreiIDE.inlineEdit.reject",
+        "key": "escape",
+        "when": "editorTextFocus && xpreiIDE.inlineEditActive"
       }
     ],
     "configuration": {
@@ -95,7 +125,7 @@
     "watch": "npm run compile -- --sourcemap --watch",
     "vscode:prepublish": "npm run compile -- --minify",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts"
+    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/edit/prompt.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

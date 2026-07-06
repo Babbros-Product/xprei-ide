@@ -2,6 +2,7 @@
 
 import * as vscode from "vscode";
 import { ContextEngine } from "./context/contextEngine";
+import { InlineEditController } from "./edit/inlineEdit";
 import { ProviderConfig } from "./providers/provider";
 import { ProviderRegistry } from "./providers/registry";
 import { ChatViewProvider } from "./ui/chat/chatView";
@@ -12,6 +13,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const engine = new ContextEngine(registry, context.storageUri, log);
 
   const chat = new ChatViewProvider(context.extensionUri, registry, engine);
+  const inlineEdit = new InlineEditController(registry);
 
   // Keep the index fresh as the user edits.
   const watcher = vscode.workspace.createFileSystemWatcher("**/*");
@@ -22,6 +24,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     log,
     watcher,
+    inlineEdit,
+    vscode.commands.registerCommand("xpreiIDE.inlineEdit", () => inlineEdit.run()),
+    vscode.commands.registerCommand("xpreiIDE.inlineEdit.accept", () => inlineEdit.accept()),
+    vscode.commands.registerCommand("xpreiIDE.inlineEdit.reject", () => inlineEdit.reject()),
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, chat, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
