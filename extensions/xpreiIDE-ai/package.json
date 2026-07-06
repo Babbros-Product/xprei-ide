@@ -1,0 +1,94 @@
+{
+  "name": "xpreiIDE-ai",
+  "displayName": "xpreiIDE AI",
+  "description": "Bring-your-own-model AI assistant. Chat with local Ollama or any OpenAI-compatible endpoint.",
+  "version": "0.0.1",
+  "publisher": "xpreiIDE",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Chat",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "xpreiIDE",
+          "title": "xpreiIDE",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "xpreiIDE": [
+        {
+          "type": "webview",
+          "id": "xpreiIDE.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "xpreiIDE.selectModel",
+        "title": "xpreiIDE: Select Model"
+      },
+      {
+        "command": "xpreiIDE.setApiKey",
+        "title": "xpreiIDE: Set Provider API Key"
+      }
+    ],
+    "configuration": {
+      "title": "xpreiIDE AI",
+      "properties": {
+        "xpreiIDE.providers": {
+          "type": "array",
+          "default": [
+            {
+              "id": "ollama-local",
+              "kind": "ollama",
+              "label": "Ollama (local)",
+              "baseUrl": "http://localhost:11434"
+            }
+          ],
+          "description": "Configured model providers. Each entry: { id, kind: 'ollama' | 'openai-compat', label, baseUrl, model? }. API keys are stored separately via 'xpreiIDE: Set Provider API Key'.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "kind": { "type": "string", "enum": ["ollama", "openai-compat"] },
+              "label": { "type": "string" },
+              "baseUrl": { "type": "string" },
+              "model": { "type": "string" }
+            },
+            "required": ["id", "kind", "baseUrl"]
+          }
+        },
+        "xpreiIDE.activeModel": {
+          "type": "string",
+          "default": "",
+          "description": "Currently selected model, formatted 'providerId::modelName'. Set via 'xpreiIDE: Select Model'."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "npm run compile -- --sourcemap --watch",
+    "vscode:prepublish": "npm run compile -- --minify",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.21.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.4.0"
+  }
+}
