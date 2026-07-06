@@ -9,6 +9,7 @@
   const sendBtn = /** @type {HTMLButtonElement} */ (document.getElementById("sendBtn"));
   const stopBtn = /** @type {HTMLButtonElement} */ (document.getElementById("stopBtn"));
   const resetBtn = /** @type {HTMLButtonElement} */ (document.getElementById("resetBtn"));
+  const agentChk = /** @type {HTMLInputElement} */ (document.getElementById("agentChk"));
 
   let streamingEl = null;
   let busy = false;
@@ -32,10 +33,11 @@
     if (busy) return;
     const text = input.value.trim();
     if (!text) return;
+    const agent = agentChk.checked;
     addMessage("user", text);
     input.value = "";
     setBusy(true);
-    vscode.postMessage({ type: "send", text });
+    vscode.postMessage({ type: "send", text, agent });
   }
 
   form.addEventListener("submit", (e) => {
@@ -83,8 +85,41 @@
         streamingEl = null;
         setBusy(false);
         break;
+      case "agent":
+        handleAgent(msg);
+        break;
     }
   });
+
+  // Render one agent-loop event as a labeled transcript entry.
+  function handleAgent(msg) {
+    switch (msg.kind) {
+      case "start":
+        addMessage("agent-step", "Agent started.");
+        break;
+      case "step":
+        addMessage("agent-step", "Step " + msg.n);
+        break;
+      case "thought":
+        addMessage("agent-thought", msg.text);
+        break;
+      case "tool":
+        addMessage("agent-tool", "› " + msg.name + ": " + msg.text);
+        break;
+      case "observation":
+        addMessage("agent-obs", msg.text);
+        break;
+      case "final":
+        addMessage("assistant", msg.text);
+        break;
+      case "error":
+        addMessage("error", msg.text);
+        break;
+      case "end":
+        setBusy(false);
+        break;
+    }
+  }
 
   // Ask the extension to replay history — covers reload after the panel was
   // hidden or the dev host restarted.

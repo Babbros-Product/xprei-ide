@@ -61,6 +61,10 @@
       {
         "command": "xpreiIDE.inlineEdit.reject",
         "title": "xpreiIDE: Reject Inline Edit"
+      },
+      {
+        "command": "xpreiIDE.revertAgentRun",
+        "title": "xpreiIDE: Revert Last Agent Run"
       }
     ],
     "keybindings": [
@@ -116,6 +120,16 @@
           "type": "string",
           "default": "",
           "description": "Embedding model for the codebase index, formatted 'providerId::modelName' (e.g. 'ollama-local::nomic-embed-text'). Set via 'xpreiIDE: Select Embedding Model'."
+        },
+        "xpreiIDE.agent.maxSteps": {
+          "type": "number",
+          "default": 20,
+          "description": "Maximum tool-call steps the agent takes before stopping a run."
+        },
+        "xpreiIDE.agent.autoApprove": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip the approval prompt for file writes and terminal commands during agent runs. Use with caution."
         }
       }
     }
@@ -125,7 +139,7 @@
     "watch": "npm run compile -- --sourcemap --watch",
     "vscode:prepublish": "npm run compile -- --minify",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/edit/prompt.test.ts"
+    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/edit/prompt.test.ts src/agent/protocol.test.ts src/agent/tools.test.ts src/agent/checkpoint.test.ts src/agent/orchestrator.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -43,6 +43,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("xpreiIDE.rebuildIndex", () =>
       rebuildIndex(engine),
     ),
+    vscode.commands.registerCommand("xpreiIDE.revertAgentRun", () =>
+      chat.revertLastRun(),
+    ),
   );
 
   void engine.load();

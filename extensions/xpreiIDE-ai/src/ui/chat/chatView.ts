@@ -2,6 +2,8 @@
 // user messages to the active provider's streaming API.
 
 import * as vscode from "vscode";
+import { Checkpoint } from "../../agent/checkpoint";
+import { runAgent } from "../../agent/runner";
 import { ContextEngine } from "../../context/contextEngine";
 import { parseMentions } from "../../context/mentions";
 import { ChatMessage, isAbortError } from "../../providers/provider";
@@ -16,6 +18,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private history: ChatMessage[] = [];
   private inflight?: AbortController;
+  private lastCheckpoint?: Checkpoint;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -32,8 +35,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     view.webview.html = this.html(view.webview);
 
     view.webview.onDidReceiveMessage((msg) => {
-      if (msg?.type === "send") void this.onSend(String(msg.text ?? ""));
-      else if (msg?.type === "stop") this.inflight?.abort();
+      if (msg?.type === "send") {
+        if (msg.agent) void this.onAgent(String(msg.text ?? ""));
+        else void this.onSend(String(msg.text ?? ""));
+      } else if (msg?.type === "stop") this.inflight?.abort();
       else if (msg?.type === "reset") this.history = [];
       else if (msg?.type === "ready") this.rehydrate();
     });
@@ -119,6 +124,44 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // Agent mode: run the autonomous tool loop for a task. Streams step/tool/
+  // observation events into the transcript; keeps a checkpoint for revert.
+  private async onAgent(text: string): Promise<void> {
+    const task = text.trim();
+    if (!task || this.inflight) return;
+
+    this.inflight = new AbortController();
+    this.post({ type: "agent", kind: "start" });
+    try {
+      const run = await runAgent(
+        this.registry,
+        task,
+        (m) => this.post(m),
+        this.inflight.signal,
+      );
+      this.lastCheckpoint = run.checkpoint;
+      await run.done;
+    } catch (err) {
+      this.post({ type: "agent", kind: "error", text: errText(err) });
+    } finally {
+      this.post({ type: "agent", kind: "end" });
+      this.inflight = undefined;
+    }
+  }
+
+  // Undo the file changes from the most recent agent run.
+  async revertLastRun(): Promise<void> {
+    const cp = this.lastCheckpoint;
+    if (!cp || cp.touched.length === 0) {
+      vscode.window.showInformationMessage("No agent changes to revert.");
+      return;
+    }
+    await cp.revert();
+    this.lastCheckpoint = undefined;
+    this.post({ type: "agent", kind: "observation", text: "Reverted agent changes." });
+    vscode.window.showInformationMessage(`Reverted ${cp.touched.length} file(s).`);
+  }
+
   private html(webview: vscode.Webview): string {
     const nonce = getNonce();
     const scriptUri = webview.asWebviewUri(
@@ -149,6 +192,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       <button type="submit" id="sendBtn">Send</button>
       <button type="button" id="stopBtn" disabled>Stop</button>
       <button type="button" id="resetBtn">Reset</button>
+      <label class="agentToggle"><input type="checkbox" id="agentChk" /> Agent</label>
     </div>
   </form>
   <script nonce="${nonce}" src="${scriptUri}"></script>

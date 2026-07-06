@@ -48,6 +48,7 @@ the API version segment (e.g. `/v1`).
 | Chat sidebar | `src/ui/chat/chatView.ts`, `media/chat.*` |
 | Context / RAG index | `src/context/*.ts` |
 | Inline (Cmd-K) edit | `src/edit/*.ts` |
+| Agent loop (tools, ReAct protocol) | `src/agent/*.ts` |
 | Activation + commands | `src/extension.ts` |
 
 ## Codebase context (@mentions)
@@ -63,4 +64,22 @@ Select code, press **Cmd-K** (Ctrl-K on Windows/Linux), type an instruction. The
 model's rewrite appears as an inline red(old)/green(new) diff — **Enter** accepts,
 **Esc** rejects.
 
-Next phase (see the architecture plan): P4 agent loop.
+## Agent (autonomous multi-file)
+
+Tick **Agent** in the chat composer, describe a task (e.g. *"add a /health route
+and a test"*), and Send. The agent runs a tool loop — `read_file`, `list_dir`,
+`grep`, `create_file`, `edit_file`, `run_terminal` — one step at a time, streaming
+its thoughts, tool calls, and observations into the transcript.
+
+- **Universal protocol.** No reliance on native function-calling: every model
+  speaks one JSON tool protocol (`src/agent/protocol.ts`), so local Ollama models
+  work the same as hosted ones. Agent quality is still model-gated — a 7B local
+  model is not GPT-4-class.
+- **Approval gates.** File writes and terminal commands prompt for approval
+  (**Approve** / **Approve all**). Set `xpreiIDE.agent.autoApprove` to skip.
+- **Revert.** Every run is checkpointed; **xpreiIDE: Revert Last Agent Run** undoes
+  all of its file changes (restores edits, deletes new files).
+- **Bounds.** `xpreiIDE.agent.maxSteps` (default 20) caps a run.
+
+Next phase (see the architecture plan): P0 — package into a downloadable branded
+IDE (Code-OSS distro build).
