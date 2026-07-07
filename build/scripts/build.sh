@@ -32,8 +32,23 @@ step "Building xpreiIDE-ai extension"
 [ -d "$ext_dir/node_modules" ] || npm install --prefix "$ext_dir"
 npm run compile --prefix "$ext_dir" -- --minify
 
-step "yarn install (VS Code) — slow, native deps"
+step "yarn install (VS Code root) — slow, native deps"
 yarn --cwd "$vscode_dir"
+
+# VS Code keeps a SEPARATE build/package.json for its own build tooling deps
+# (e.g. ternary-stream) — gulpfile.js fails without it.
+step "yarn install (VS Code build/ subfolder)"
+yarn --cwd "$vscode_dir/build"
+
+# Every built-in extension has its own package.json too (including nested
+# */server subfolders for the language-feature extensions, plus extensions/
+# itself) — gulp's bundle-extensions-build step expects these pre-installed.
+step "yarn install (built-in extensions, recursively)"
+find "$vscode_dir/extensions" -name package.json -not -path "*/node_modules/*" \
+  -exec dirname {} \; | while read -r d; do yarn --cwd "$d"; done
+yarn --cwd "$vscode_dir/extensions"
+
+step "gulp $target — slow (~30-45 min, full recompile every run)"
 yarn --cwd "$vscode_dir" gulp "$target"
 
 step "Staging xpreiIDE-ai as a built-in"

@@ -43,11 +43,32 @@ if (-not $StageOnly) {
   if (-not (Test-Path (Join-Path $extDir "node_modules"))) { npm install --prefix $extDir }
   npm run compile --prefix $extDir -- --minify
 
-  # 4. Install VS Code build deps + compile the product. --cwd is yarn's
-  # equivalent explicit pin (avoids ambient-cwd reliance across processes).
-  Step "yarn install (VS Code) — slow, native deps"
-  yarn --cwd $vscodeDir
-  Step "gulp vscode-win32-$Arch — slow"
+  # 4. Install VS Code build deps. --cwd is yarn's explicit-cwd pin (avoids
+  # ambient-cwd reliance across processes). --ignore-scripts skips node-gyp
+  # entirely: several built-in native modules (@vscode/policy-watcher,
+  # @vscode/spdlog, @vscode/deviceid, @vscode/windows-ca-certs) fail to compile
+  # under a nested Windows Job Object (seen when driven from a sandboxed agent
+  # shell) with "AssignProcessToJobObject: (87)". They're runtime-only bindings
+  # for enterprise policy/cert-store/logging/telemetry — unneeded to build or
+  # run the editor, so skipping their install scripts is a safe workaround.
+  Step "yarn install (VS Code root) — slow, scripts skipped"
+  yarn --cwd $vscodeDir install --ignore-scripts
+
+  # VS Code keeps a SEPARATE build/package.json for its own build tooling deps
+  # (e.g. ternary-stream) — easy to miss, gulpfile.js fails without it.
+  Step "yarn install (VS Code build/ subfolder)"
+  yarn --cwd (Join-Path $vscodeDir "build") install --ignore-scripts
+
+  # Every built-in extension also has its own package.json (including nested
+  # */server subfolders for the language-feature extensions, plus extensions/
+  # itself) — gulp's bundle-extensions-build step expects these pre-installed.
+  Step "yarn install (built-in extensions, recursively)"
+  Get-ChildItem (Join-Path $vscodeDir "extensions") -Recurse -Filter "package.json" |
+    Where-Object { $_.FullName -notmatch "\\node_modules\\" } |
+    ForEach-Object { yarn --cwd $_.Directory.FullName install --ignore-scripts }
+  yarn --cwd (Join-Path $vscodeDir "extensions") install --ignore-scripts
+
+  Step "gulp vscode-win32-$Arch — slow (~30-45 min, full recompile every run)"
   yarn --cwd $vscodeDir gulp "vscode-win32-$Arch"
 }
 
