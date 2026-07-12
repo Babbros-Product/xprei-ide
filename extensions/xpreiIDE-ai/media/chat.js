@@ -10,6 +10,7 @@
   const stopBtn = /** @type {HTMLButtonElement} */ (document.getElementById("stopBtn"));
   const resetBtn = /** @type {HTMLButtonElement} */ (document.getElementById("resetBtn"));
   const agentChk = /** @type {HTMLInputElement} */ (document.getElementById("agentChk"));
+  const modelSelect = /** @type {HTMLSelectElement} */ (document.getElementById("modelSelect"));
 
   let streamingEl = null;
   let busy = false;
@@ -28,6 +29,37 @@
     sendBtn.disabled = value;
     stopBtn.disabled = !value;
   }
+
+  function renderModels(items) {
+    modelSelect.innerHTML = "";
+    const groups = new Map();
+    for (const item of items) {
+      let group = groups.get(item.providerLabel);
+      if (!group) {
+        group = document.createElement("optgroup");
+        group.label = item.providerLabel;
+        groups.set(item.providerLabel, group);
+        modelSelect.appendChild(group);
+      }
+      const opt = document.createElement("option");
+      opt.value = item.providerId + "::" + item.model;
+      opt.textContent = item.model;
+      if (item.active) opt.selected = true;
+      group.appendChild(opt);
+    }
+    const addOpt = document.createElement("option");
+    addOpt.value = "__add__";
+    addOpt.textContent = "+ Add provider…";
+    modelSelect.appendChild(addOpt);
+  }
+
+  modelSelect.addEventListener("change", () => {
+    if (modelSelect.value === "__add__") {
+      vscode.postMessage({ type: "addProvider" });
+      return;
+    }
+    vscode.postMessage({ type: "selectModel", pointer: modelSelect.value });
+  });
 
   function submit() {
     if (busy) return;
@@ -87,6 +119,9 @@
         break;
       case "agent":
         handleAgent(msg);
+        break;
+      case "models":
+        renderModels(msg.items);
         break;
     }
   });
