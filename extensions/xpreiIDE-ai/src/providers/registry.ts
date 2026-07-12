@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import { OllamaProvider } from "./ollama";
 import { OpenAICompatProvider } from "./openai-compat";
 import { Provider, ProviderConfig } from "./provider";
+import { aggregateModels, ModelEntry } from "./modelList";
 
 const SECRET_PREFIX = "xpreiIDE.apiKey.";
 
@@ -43,6 +44,16 @@ export class ProviderRegistry {
   // Resolve the embedding model (xpreiIDE.embedModel) for the RAG index.
   async resolveEmbed(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("embedModel");
+  }
+
+  // Aggregate every model from every configured provider, for the chat
+  // panel's model picker. Never throws — a provider that fails to list
+  // models is skipped (or falls back to its configured default model).
+  async listAllModels(): Promise<ModelEntry[]> {
+    const activePointer = vscode.workspace
+      .getConfiguration("xpreiIDE")
+      .get<string>("activeModel", "");
+    return aggregateModels(this.getConfigs(), (cfg) => this.build(cfg), activePointer);
   }
 
   private async resolvePointer(setting: string): Promise<ResolvedModel | undefined> {
