@@ -6,7 +6,13 @@ import { ProviderRegistry } from "../providers/registry";
 import { Agent, AgentEvents, Approver } from "./orchestrator";
 import { VscodeAgentHost } from "./host";
 import { Checkpoint } from "./checkpoint";
-import { Tool } from "./tools";
+import { Tool, TOOLS } from "./tools";
+
+export type AgentMode = "edit" | "agent";
+
+// Edit mode drops shell access — file read/create/edit tools only, no
+// run_terminal — so "Edit" can't run arbitrary commands, only "Agent" can.
+const EDIT_MODE_TOOLS = TOOLS.filter((t) => t.name !== "run_terminal");
 
 // Approver backed by a modal dialog. "Approve all" flips auto-approve for the
 // rest of the run; a config default can pre-approve everything.
@@ -58,6 +64,7 @@ export async function runAgent(
   task: string,
   post: (msg: unknown) => void,
   signal: AbortSignal,
+  mode: AgentMode = "agent",
 ): Promise<AgentRun> {
   const resolved = await registry.resolveActive();
   if (!resolved) throw new Error("No model selected. Run 'xpreiIDE: Select Model' first.");
@@ -86,6 +93,7 @@ export async function runAgent(
     approver: new ModalApprover(autoApprove),
     events,
     maxSteps,
+    tools: mode === "edit" ? EDIT_MODE_TOOLS : TOOLS,
   });
 
   const done = agent.run(task, signal);

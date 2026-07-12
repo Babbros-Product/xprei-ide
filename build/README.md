@@ -51,6 +51,13 @@ First build takes tens of minutes and downloads a lot; later builds are faster.
    trimmed `package.json`) into the built app's `resources/app/extensions/xpreiIDE-ai`.
    Post-build staging avoids fighting VS Code's in-tree extension compile pipeline.
 
+## Configuring AI models
+
+The build above ships an empty model list — nothing works until you point
+xpreiIDE at a model. See **[MODELS.md](MODELS.md)** for the full guide
+(gear icon in the chat panel, OpenAI/Gemini/Ollama base URLs, raw settings
+JSON, and the Plan/Edit/Agent chat modes).
+
 ## Installer (optional)
 
 ```powershell

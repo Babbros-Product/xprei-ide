@@ -9,8 +9,19 @@
   const sendBtn = /** @type {HTMLButtonElement} */ (document.getElementById("sendBtn"));
   const stopBtn = /** @type {HTMLButtonElement} */ (document.getElementById("stopBtn"));
   const resetBtn = /** @type {HTMLButtonElement} */ (document.getElementById("resetBtn"));
-  const agentChk = /** @type {HTMLInputElement} */ (document.getElementById("agentChk"));
   const modelSelect = /** @type {HTMLSelectElement} */ (document.getElementById("modelSelect"));
+  const modeBtns = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll(".modeBtn"));
+  const gearBtn = /** @type {HTMLButtonElement} */ (document.getElementById("gearBtn"));
+  const settingsPanel = /** @type {HTMLElement} */ (document.getElementById("settingsPanel"));
+  const providerList = /** @type {HTMLElement} */ (document.getElementById("providerList"));
+  const addProviderForm = /** @type {HTMLFormElement} */ (document.getElementById("addProviderForm"));
+  const cfgKind = /** @type {HTMLSelectElement} */ (document.getElementById("cfgKind"));
+  const cfgLabel = /** @type {HTMLInputElement} */ (document.getElementById("cfgLabel"));
+  const cfgBaseUrl = /** @type {HTMLInputElement} */ (document.getElementById("cfgBaseUrl"));
+  const cfgModel = /** @type {HTMLInputElement} */ (document.getElementById("cfgModel"));
+  const cfgApiKey = /** @type {HTMLInputElement} */ (document.getElementById("cfgApiKey"));
+
+  let mode = "plan";
 
   let streamingEl = null;
   let busy = false;
@@ -66,15 +77,21 @@
     vscode.postMessage({ type: "selectModel", pointer: modelSelect.value });
   });
 
+  modeBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      mode = btn.dataset.mode || "plan";
+      modeBtns.forEach((b) => b.classList.toggle("active", b === btn));
+    });
+  });
+
   function submit() {
     if (busy) return;
     const text = input.value.trim();
     if (!text) return;
-    const agent = agentChk.checked;
     addMessage("user", text);
     input.value = "";
     setBusy(true);
-    vscode.postMessage({ type: "send", text, agent });
+    vscode.postMessage({ type: "send", text, mode });
   }
 
   form.addEventListener("submit", (e) => {
@@ -87,6 +104,53 @@
       e.preventDefault();
       submit();
     }
+  });
+
+  gearBtn.addEventListener("click", () => {
+    const opening = settingsPanel.classList.contains("hidden");
+    settingsPanel.classList.toggle("hidden");
+    if (opening) vscode.postMessage({ type: "getProviders" });
+  });
+
+  cfgKind.addEventListener("change", () => {
+    cfgApiKey.style.display = cfgKind.value === "ollama" ? "none" : "";
+  });
+
+  function renderProviders(items) {
+    providerList.innerHTML = "";
+    for (const cfg of items) {
+      const row = document.createElement("div");
+      row.className = "providerRow";
+      const info = document.createElement("span");
+      info.textContent = cfg.label + " (" + cfg.kind + ") — " + cfg.baseUrl;
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => {
+        vscode.postMessage({ type: "removeProvider", id: cfg.id });
+      });
+      row.appendChild(info);
+      row.appendChild(removeBtn);
+      providerList.appendChild(row);
+    }
+  }
+
+  addProviderForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    vscode.postMessage({
+      type: "saveProvider",
+      cfg: {
+        kind: cfgKind.value,
+        label: cfgLabel.value.trim(),
+        baseUrl: cfgBaseUrl.value.trim(),
+        model: cfgModel.value.trim(),
+      },
+      apiKey: cfgApiKey.value,
+    });
+    cfgLabel.value = "";
+    cfgBaseUrl.value = "";
+    cfgModel.value = "";
+    cfgApiKey.value = "";
   });
 
   stopBtn.addEventListener("click", () => vscode.postMessage({ type: "stop" }));
@@ -127,6 +191,9 @@
         break;
       case "models":
         renderModels(msg.items);
+        break;
+      case "providers":
+        renderProviders(msg.items);
         break;
     }
   });

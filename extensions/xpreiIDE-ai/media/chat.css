@@ -13,30 +13,128 @@ body {
   color: var(--vscode-foreground);
 }
 
-#messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
+.chatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  flex-shrink: 0;
+}
+
+.chatHeader .title {
+  font-weight: 600;
+  font-size: 0.95em;
+  letter-spacing: 0.02em;
+}
+
+.iconBtn {
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  font-size: 1.1em;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.settingsPanel {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  flex-shrink: 0;
+}
+
+.settingsPanel.hidden {
+  display: none;
+}
+
+.providerList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.providerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.providerRow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.providerRow button {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.addProviderForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.addProviderForm input,
+.addProviderForm select {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  padding: 5px 6px;
+}
+
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .msg {
+  position: relative;
+  max-width: 92%;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .msg.user {
-  background: var(--vscode-input-background);
+  align-self: flex-end;
+  background: var(--vscode-badge-background, var(--vscode-input-background));
+  color: var(--vscode-badge-foreground, var(--vscode-input-foreground));
   border: 1px solid var(--vscode-input-border, transparent);
 }
 
 .msg.assistant {
+  align-self: flex-start;
   background: var(--vscode-editor-inactiveSelectionBackground);
+  border-left: 2px solid var(--vscode-focusBorder, var(--vscode-panel-border));
 }
 
 .msg.error {
@@ -82,14 +180,36 @@ body {
   overflow-y: auto;
 }
 
-.agentToggle {
+.modeSelector {
   display: flex;
-  align-items: center;
-  gap: 4px;
   margin-left: auto;
-  font-size: 0.9em;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.modeBtn {
+  font-family: inherit;
+  font-size: 0.85em;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 5px 10px;
   cursor: pointer;
-  user-select: none;
+}
+
+.modeBtn + .modeBtn {
+  border-left: 1px solid var(--vscode-panel-border);
+}
+
+.modeBtn.active {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+.modeBtn:hover:not(.active) {
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
 #composer {
@@ -116,6 +236,7 @@ body {
 .row {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 #modelSelect {

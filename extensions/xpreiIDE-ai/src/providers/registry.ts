@@ -36,6 +36,28 @@ export class ProviderRegistry {
     await this.secrets.store(SECRET_PREFIX + providerId, key);
   }
 
+  async deleteApiKey(providerId: string): Promise<void> {
+    await this.secrets.delete(SECRET_PREFIX + providerId);
+  }
+
+  // Add a provider config (chat settings-panel "Save provider"). Appends to
+  // the existing list; caller is responsible for a unique cfg.id.
+  async addConfig(cfg: ProviderConfig): Promise<void> {
+    const existing = this.getConfigs();
+    await vscode.workspace
+      .getConfiguration("xpreiIDE")
+      .update("providers", [...existing, cfg], vscode.ConfigurationTarget.Global);
+  }
+
+  // Remove a provider config and its stored key (chat settings-panel "Remove").
+  async removeConfig(providerId: string): Promise<void> {
+    const remaining = this.getConfigs().filter((c) => c.id !== providerId);
+    await vscode.workspace
+      .getConfiguration("xpreiIDE")
+      .update("providers", remaining, vscode.ConfigurationTarget.Global);
+    await this.deleteApiKey(providerId);
+  }
+
   // Parse the "providerId::model" pointer stored in xpreiIDE.activeModel.
   async resolveActive(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("activeModel");

@@ -3,15 +3,27 @@
 
 import * as vscode from "vscode";
 import { Checkpoint } from "../../agent/checkpoint";
-import { runAgent } from "../../agent/runner";
+import { AgentMode, runAgent } from "../../agent/runner";
 import { ContextEngine } from "../../context/contextEngine";
 import { parseMentions } from "../../context/mentions";
-import { ChatMessage, isAbortError } from "../../providers/provider";
+import { ChatMessage, isAbortError, ProviderConfig } from "../../providers/provider";
 import { ProviderRegistry } from "../../providers/registry";
 import { runAddProviderFlow } from "../../providers/addProviderFlow";
+import { uniqueProviderId } from "../../providers/presets";
 
-const SYSTEM_PROMPT =
-  "You are xpreiIDE, a concise coding assistant embedded in the user's IDE.";
+// Plan mode has no file-editing tools at all (plain chat), so the model is
+// told explicitly not to claim it changed anything — Edit/Agent modes get
+// their tool list (and its description) straight from the agent loop.
+const PLAN_SYSTEM_PROMPT =
+  "You are xpreiIDE in Plan mode: a concise coding assistant embedded in the " +
+  "user's IDE. Analyze and propose an approach in prose or code snippets. " +
+  "You have no file-editing tools in this mode — never claim to have created " +
+  "or modified a file; suggest switching to Edit or Agent mode for that.";
+
+function slugify(label: string, fallback: string): string {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || fallback;
+}
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "xpreiIDE.chat";
@@ -37,8 +49,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     view.webview.onDidReceiveMessage((msg) => {
       if (msg?.type === "send") {
-        if (msg.agent) void this.onAgent(String(msg.text ?? ""));
-        else void this.onSend(String(msg.text ?? ""));
+        const mode = msg.mode === "edit" || msg.mode === "agent" ? msg.mode : "plan";
+        if (mode === "plan") void this.onSend(String(msg.text ?? ""));
+        else void this.onAgent(String(msg.text ?? ""), mode);
       } else if (msg?.type === "stop") this.inflight?.abort();
       else if (msg?.type === "reset") this.history = [];
       else if (msg?.type === "ready") {
@@ -46,6 +59,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         void this.sendModels();
       } else if (msg?.type === "selectModel") void this.onSelectModel(String(msg.pointer ?? ""));
       else if (msg?.type === "addProvider") void this.onAddProvider();
+      else if (msg?.type === "getProviders") void this.sendProviders();
+      else if (msg?.type === "saveProvider") void this.onSaveProvider(msg.cfg, String(msg.apiKey ?? ""));
+      else if (msg?.type === "removeProvider") void this.onRemoveProvider(String(msg.id ?? ""));
     });
   }
 
@@ -76,6 +92,57 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async onAddProvider(): Promise<void> {
     await runAddProviderFlow(this.registry);
+    await this.sendModels();
+  }
+
+  // Push the full provider config list (no secrets) to the settings panel.
+  private async sendProviders(): Promise<void> {
+    this.post({ type: "providers", items: this.registry.getConfigs() });
+  }
+
+  // Settings-panel "Save provider": validate, assign a unique id, persist
+  // the config, store the key (if any), then refresh both panels.
+  private async onSaveProvider(
+    rawCfg: unknown,
+    apiKey: string,
+  ): Promise<void> {
+    const cfg = rawCfg as Partial<ProviderConfig> | undefined;
+    const kind = cfg?.kind === "ollama" ? "ollama" : "openai-compat";
+    const label = String(cfg?.label ?? "").trim();
+    const baseUrl = String(cfg?.baseUrl ?? "").trim();
+    const model = String(cfg?.model ?? "").trim();
+    if (!baseUrl) {
+      this.post({ type: "error", text: "Provider needs a base URL." });
+      return;
+    }
+
+    const existing = this.registry.getConfigs();
+    const id = uniqueProviderId(
+      slugify(label, kind),
+      existing.map((c) => c.id),
+    );
+    const finalLabel = label || id;
+
+    await this.registry.addConfig({
+      id,
+      kind,
+      label: finalLabel,
+      baseUrl,
+      ...(model ? { model } : {}),
+    });
+    if (kind === "openai-compat" && apiKey) {
+      await this.registry.setApiKey(id, apiKey);
+    }
+
+    this.post({ type: "info", text: `Added provider ${finalLabel}.` });
+    await this.sendProviders();
+    await this.sendModels();
+  }
+
+  private async onRemoveProvider(id: string): Promise<void> {
+    if (!id) return;
+    await this.registry.removeConfig(id);
+    await this.sendProviders();
     await this.sendModels();
   }
 
@@ -112,7 +179,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ type: "start" });
 
     const messages: ChatMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: PLAN_SYSTEM_PROMPT },
       ...(contextBlock ? [{ role: "system" as const, content: contextBlock }] : []),
       ...this.history,
     ];
@@ -149,9 +216,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  // Agent mode: run the autonomous tool loop for a task. Streams step/tool/
-  // observation events into the transcript; keeps a checkpoint for revert.
-  private async onAgent(text: string): Promise<void> {
+  // Edit/Agent mode: run the tool loop for a task (Edit drops shell access).
+  // Streams step/tool/observation events into the transcript; keeps a
+  // checkpoint for revert.
+  private async onAgent(text: string, mode: AgentMode): Promise<void> {
     const task = text.trim();
     if (!task || this.inflight) return;
 
@@ -163,6 +231,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         task,
         (m) => this.post(m),
         this.inflight.signal,
+        mode,
       );
       this.lastCheckpoint = run.checkpoint;
       await run.done;
@@ -210,15 +279,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   <link href="${styleUri}" rel="stylesheet" />
 </head>
 <body>
+  <div id="chatHeader" class="chatHeader">
+    <span class="title">xpreiIDE</span>
+    <button type="button" id="gearBtn" class="iconBtn" title="Model settings" aria-label="Model settings">⚙</button>
+  </div>
+  <div id="settingsPanel" class="settingsPanel hidden">
+    <div id="providerList" class="providerList"></div>
+    <form id="addProviderForm" class="addProviderForm">
+      <select id="cfgKind" aria-label="Provider kind">
+        <option value="openai-compat">OpenAI-compatible (OpenAI, Gemini, …)</option>
+        <option value="ollama">Ollama (local)</option>
+      </select>
+      <input id="cfgLabel" type="text" placeholder="Label (e.g. OpenAI)" />
+      <input id="cfgBaseUrl" type="text" placeholder="Base URL (e.g. https://api.openai.com/v1)" />
+      <input id="cfgModel" type="text" placeholder="Default model (optional)" />
+      <input id="cfgApiKey" type="password" placeholder="API key" autocomplete="off" />
+      <button type="submit" id="saveProviderBtn">Save provider</button>
+    </form>
+  </div>
   <div id="messages"></div>
   <form id="composer">
     <textarea id="input" rows="3" placeholder="Ask xpreiIDE…  (Enter to send, Shift+Enter for newline)"></textarea>
     <div class="row">
       <select id="modelSelect" aria-label="Model"></select>
+      <div class="modeSelector" role="radiogroup" aria-label="Mode">
+        <button type="button" class="modeBtn active" data-mode="plan">Plan</button>
+        <button type="button" class="modeBtn" data-mode="edit">Edit</button>
+        <button type="button" class="modeBtn" data-mode="agent">Agent</button>
+      </div>
+    </div>
+    <div class="row">
       <button type="submit" id="sendBtn">Send</button>
       <button type="button" id="stopBtn" disabled>Stop</button>
       <button type="button" id="resetBtn">Reset</button>
-      <label class="agentToggle"><input type="checkbox" id="agentChk" /> Agent</label>
     </div>
   </form>
   <script nonce="${nonce}" src="${scriptUri}"></script>
