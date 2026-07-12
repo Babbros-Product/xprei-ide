@@ -53,3 +53,21 @@ test("aggregateModels skips a provider with no fallback but keeps others", async
   const entries = await aggregateModels([cfgOk, cfgNoFallback], build, "");
   assert.deepEqual(entries, [{ providerId: "a", providerLabel: "A", model: "m1", active: false }]);
 });
+
+test("aggregateModels does not hang when one provider's listModels never resolves", async () => {
+  const hungProvider: Provider = {
+    id: "hung",
+    label: "Hung",
+    capabilities: caps,
+    async listModels() {
+      return new Promise<string[]>(() => {
+        // never resolves or rejects — simulates a stalled endpoint
+      });
+    },
+    async *chatStream() {},
+  };
+  const cfgHung: ProviderConfig = { id: "hung", kind: "openai-compat", label: "Hung", baseUrl: "http://hung" };
+  const build = async (cfg: ProviderConfig) => (cfg.id === "hung" ? hungProvider : fakeProvider(cfg.id, ["m1"]));
+  const entries = await aggregateModels([cfgOk, cfgHung], build, "", 20);
+  assert.deepEqual(entries, [{ providerId: "a", providerLabel: "A", model: "m1", active: false }]);
+});

@@ -84,8 +84,8 @@ export async function runAddProviderFlow(registry: ProviderRegistry): Promise<vo
     ...(model ? { model } : {}),
   };
 
-  await settings.update("providers", [...existing, cfg], vscode.ConfigurationTarget.Global);
   if (choice.needsKey) await registry.setApiKey(id, apiKey);
+  await settings.update("providers", [...existing, cfg], vscode.ConfigurationTarget.Global);
 
   const activePointer = settings.get<string>("activeModel", "");
   if (!activePointer && model) {

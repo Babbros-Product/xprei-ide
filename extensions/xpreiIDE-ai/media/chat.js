@@ -30,6 +30,8 @@
     stopBtn.disabled = !value;
   }
 
+  let lastPointer = "";
+
   function renderModels(items) {
     modelSelect.innerHTML = "";
     const groups = new Map();
@@ -51,13 +53,16 @@
     addOpt.value = "__add__";
     addOpt.textContent = "+ Add provider…";
     modelSelect.appendChild(addOpt);
+    lastPointer = modelSelect.value === "__add__" ? "" : modelSelect.value;
   }
 
   modelSelect.addEventListener("change", () => {
     if (modelSelect.value === "__add__") {
+      modelSelect.value = lastPointer;
       vscode.postMessage({ type: "addProvider" });
       return;
     }
+    lastPointer = modelSelect.value;
     vscode.postMessage({ type: "selectModel", pointer: modelSelect.value });
   });
 
