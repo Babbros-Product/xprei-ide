@@ -8,6 +8,7 @@ import { ContextEngine } from "../../context/contextEngine";
 import { parseMentions } from "../../context/mentions";
 import { ChatMessage, isAbortError } from "../../providers/provider";
 import { ProviderRegistry } from "../../providers/registry";
+import { runAddProviderFlow } from "../../providers/addProviderFlow";
 
 const SYSTEM_PROMPT =
   "You are xpreiIDE, a concise coding assistant embedded in the user's IDE.";
@@ -40,7 +41,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         else void this.onSend(String(msg.text ?? ""));
       } else if (msg?.type === "stop") this.inflight?.abort();
       else if (msg?.type === "reset") this.history = [];
-      else if (msg?.type === "ready") this.rehydrate();
+      else if (msg?.type === "ready") {
+        this.rehydrate();
+        void this.sendModels();
+      } else if (msg?.type === "selectModel") void this.onSelectModel(String(msg.pointer ?? ""));
+      else if (msg?.type === "addProvider") void this.onAddProvider();
     });
   }
 
@@ -52,6 +57,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "restore", role: m.role, text: m.content });
       }
     }
+  }
+
+  // Push the current cross-provider model list to the webview, e.g. on load
+  // or after a selection/add-provider round trip changes what's available.
+  private async sendModels(): Promise<void> {
+    const items = await this.registry.listAllModels();
+    this.post({ type: "models", items });
+  }
+
+  private async onSelectModel(pointer: string): Promise<void> {
+    if (!pointer) return;
+    await vscode.workspace
+      .getConfiguration("xpreiIDE")
+      .update("activeModel", pointer, vscode.ConfigurationTarget.Global);
+    await this.sendModels();
+  }
+
+  private async onAddProvider(): Promise<void> {
+    await runAddProviderFlow(this.registry);
+    await this.sendModels();
   }
 
   private post(msg: unknown): void {
@@ -189,6 +214,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   <form id="composer">
     <textarea id="input" rows="3" placeholder="Ask xpreiIDE…  (Enter to send, Shift+Enter for newline)"></textarea>
     <div class="row">
+      <select id="modelSelect" aria-label="Model"></select>
       <button type="submit" id="sendBtn">Send</button>
       <button type="button" id="stopBtn" disabled>Stop</button>
       <button type="button" id="resetBtn">Reset</button>
