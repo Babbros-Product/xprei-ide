@@ -5,6 +5,7 @@ import { ContextEngine } from "./context/contextEngine";
 import { InlineEditController } from "./edit/inlineEdit";
 import { ProviderConfig } from "./providers/provider";
 import { ProviderRegistry } from "./providers/registry";
+import { runAddProviderFlow } from "./providers/addProviderFlow";
 import { ChatViewProvider } from "./ui/chat/chatView";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -39,6 +40,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand("xpreiIDE.setApiKey", () =>
       setApiKey(registry),
+    ),
+    vscode.commands.registerCommand("xpreiIDE.addProvider", () =>
+      runAddProviderFlow(registry),
     ),
     vscode.commands.registerCommand("xpreiIDE.rebuildIndex", () =>
       rebuildIndex(engine),

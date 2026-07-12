@@ -47,6 +47,10 @@
         "title": "xpreiIDE: Set Provider API Key"
       },
       {
+        "command": "xpreiIDE.addProvider",
+        "title": "xpreiIDE: Add Model Provider"
+      },
+      {
         "command": "xpreiIDE.rebuildIndex",
         "title": "xpreiIDE: Rebuild Codebase Index"
       },
