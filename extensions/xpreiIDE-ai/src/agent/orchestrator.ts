@@ -20,6 +20,10 @@ export interface AgentEvents {
   onObservation(text: string): void;
   onFinal(text: string): void;
   onError(text: string): void;
+  // Fired after a mutating tool successfully writes a file — before/after
+  // content for editor-side feedback (e.g. a gutter flash). Optional so
+  // headless/test callers don't need to implement it.
+  onEdit?(path: string, before: string, after: string): void;
 }
 
 export interface Approver {
@@ -35,9 +39,12 @@ export interface AgentDeps {
   events: AgentEvents;
   tools?: Tool[];
   maxSteps?: number;
+  // Extra project-level instructions (from .xpreiIDErules) appended to the
+  // system prompt, verbatim.
+  projectRules?: string;
 }
 
-const DEFAULT_MAX_STEPS = 20;
+const DEFAULT_MAX_STEPS = 0; // 0 = unlimited (bounded only by Stop/abort or the model finishing)
 
 export class Agent {
   private readonly tools: Tool[];
@@ -49,13 +56,18 @@ export class Agent {
   }
 
   async run(task: string, signal?: AbortSignal): Promise<void> {
+    let systemPrompt = buildAgentSystemPrompt(this.tools, this.deps.host.cwd);
+    if (this.deps.projectRules) {
+      systemPrompt += `\n\nProject instructions:\n${this.deps.projectRules}`;
+    }
     const messages: ChatMessage[] = [
-      { role: "system", content: buildAgentSystemPrompt(this.tools, this.deps.host.cwd) },
+      { role: "system", content: systemPrompt },
       { role: "user", content: task },
     ];
     const maxSteps = this.deps.maxSteps ?? DEFAULT_MAX_STEPS;
+    const unlimited = maxSteps <= 0;
 
-    for (let step = 1; step <= maxSteps; step++) {
+    for (let step = 1; unlimited || step <= maxSteps; step++) {
       if (signal?.aborted) return;
       this.deps.events.onStep(step);
 
@@ -100,13 +112,19 @@ export class Agent {
     if (tool.mutating) {
       const ok = await this.deps.approver.approve(tool, action.args);
       if (!ok) return "User rejected this action. Choose a different step.";
-      // Snapshot the target path before the write so the run stays revertible.
+      // Snapshot the target path before the write so the run stays revertible
+      // — also the "before" half of the post-write diff for editor feedback.
       const path = typeof action.args.path === "string" ? action.args.path : undefined;
       if (path) await this.checkpoint.note(path);
     }
 
     try {
       const result = await tool.run(action.args, this.deps.host);
+      if (tool.mutating && result.wrote && this.deps.events.onEdit) {
+        const before = this.checkpoint.getSnapshot(result.wrote)?.content ?? "";
+        const after = await this.deps.host.readFile(result.wrote).catch(() => "");
+        this.deps.events.onEdit(result.wrote, before, after);
+      }
       return result.observation;
     } catch (err) {
       return `Error running ${tool.name}: ${err instanceof Error ? err.message : String(err)}`;

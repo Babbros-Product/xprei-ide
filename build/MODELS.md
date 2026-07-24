@@ -42,12 +42,11 @@ Gemini and OpenRouter are **not** special-cased in code — they just happen
 to expose an OpenAI-compatible `/chat/completions` endpoint, so the same
 adapter that talks to OpenAI talks to them.
 
-## Alternative: model dropdown → "+ Add provider…"
+## Alternative: the `+` button next to the model dropdown
 
-The model dropdown itself has a `+ Add provider…` entry at the bottom that
-runs the same flow as a Command Palette wizard (QuickPick steps instead of
-an inline form). Functionally identical to the gear icon; use whichever is
-more comfortable.
+A small `+` button sits right next to the model dropdown — click it to open
+the same settings panel as the gear icon. It's there so a fresh install
+(empty dropdown, nothing to click inside it) still has an obvious way in.
 
 ## Alternative: Command Palette
 

@@ -8,4 +8,6 @@ out/
 # P0 branded-distro build — generated, huge, never committed
 build/vscode/
 build/VSCode-*/
+build/asar-work/
+build/launch-log.txt
 

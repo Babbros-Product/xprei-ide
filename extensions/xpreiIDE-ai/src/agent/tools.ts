@@ -26,6 +26,10 @@ function truncate(s: string): string {
   return s.length > MAX_OBS ? s.slice(0, MAX_OBS) + "\n… (truncated)" : s;
 }
 
+function errText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export const TOOLS: Tool[] = [
   {
     name: "read_file",
@@ -42,8 +46,8 @@ export const TOOLS: Tool[] = [
           .map((l, i) => `${i + 1}\t${l}`)
           .join("\n");
         return { observation: truncate(numbered) };
-      } catch {
-        return { observation: `Error: cannot read ${path}.` };
+      } catch (err) {
+        return { observation: `Error: cannot read ${path}. ${errText(err)}` };
       }
     },
   },
@@ -57,8 +61,8 @@ export const TOOLS: Tool[] = [
       try {
         const entries = await host.listDir(path);
         return { observation: entries.length ? entries.join("\n") : "(empty)" };
-      } catch {
-        return { observation: `Error: cannot list ${path}.` };
+      } catch (err) {
+        return { observation: `Error: cannot list ${path}. ${errText(err)}` };
       }
     },
   },
@@ -114,8 +118,8 @@ export const TOOLS: Tool[] = [
       let content: string;
       try {
         content = await host.readFile(path);
-      } catch {
-        return { observation: `Error: cannot read ${path}.` };
+      } catch (err) {
+        return { observation: `Error: cannot read ${path}. ${errText(err)}` };
       }
       const first = content.indexOf(find);
       if (first < 0) return { observation: `Error: 'find' text not found in ${path}.` };

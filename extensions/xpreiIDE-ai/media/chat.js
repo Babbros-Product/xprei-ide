@@ -12,6 +12,7 @@
   const modelSelect = /** @type {HTMLSelectElement} */ (document.getElementById("modelSelect"));
   const modeBtns = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll(".modeBtn"));
   const gearBtn = /** @type {HTMLButtonElement} */ (document.getElementById("gearBtn"));
+  const addModelBtn = /** @type {HTMLButtonElement} */ (document.getElementById("addModelBtn"));
   const settingsPanel = /** @type {HTMLElement} */ (document.getElementById("settingsPanel"));
   const providerList = /** @type {HTMLElement} */ (document.getElementById("providerList"));
   const addProviderForm = /** @type {HTMLFormElement} */ (document.getElementById("addProviderForm"));
@@ -20,19 +21,112 @@
   const cfgBaseUrl = /** @type {HTMLInputElement} */ (document.getElementById("cfgBaseUrl"));
   const cfgModel = /** @type {HTMLInputElement} */ (document.getElementById("cfgModel"));
   const cfgApiKey = /** @type {HTMLInputElement} */ (document.getElementById("cfgApiKey"));
+  const cfgApiKeyField = /** @type {HTMLElement} */ (document.getElementById("cfgApiKeyField"));
+  const newChatBtn = /** @type {HTMLButtonElement} */ (document.getElementById("newChatBtn"));
+  const historyBtn = /** @type {HTMLButtonElement} */ (document.getElementById("historyBtn"));
+  const historyPanel = /** @type {HTMLElement} */ (document.getElementById("historyPanel"));
+  const sessionList = /** @type {HTMLElement} */ (document.getElementById("sessionList"));
 
   let mode = "plan";
 
   let streamingEl = null;
+  let streamingText = "";
   let busy = false;
 
-  function addMessage(role, text) {
+  const ROLE_LABELS = {
+    user: "You",
+    assistant: "xpreiIDE",
+    error: "Error",
+    "agent-thought": "Thinking",
+    "agent-tool": "Tool call",
+    "agent-obs": "Result",
+  };
+
+  // Returns the message *body* element — callers (streaming deltas) append
+  // text there, not to the outer row, so the role label stays put. `rich`
+  // parses fenced code blocks into blocks with Copy/Insert/Apply actions
+  // (Copilot/Claude-chat style); plain text otherwise.
+  function addMessage(role, text, rich) {
     const el = document.createElement("div");
     el.className = "msg " + role;
-    el.textContent = text;
+    const label = ROLE_LABELS[role];
+    if (label) {
+      const labelEl = document.createElement("div");
+      labelEl.className = "msgRole";
+      labelEl.textContent = label;
+      el.appendChild(labelEl);
+    }
+    const body = document.createElement("div");
+    body.className = "msgBody";
+    if (rich) renderRich(body, text);
+    else body.textContent = text;
+    el.appendChild(body);
     messagesEl.appendChild(el);
     messagesEl.scrollTop = messagesEl.scrollHeight;
-    return el;
+    return body;
+  }
+
+  const CODE_BLOCK_RE = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)```/g;
+
+  // Splits `text` on fenced code blocks, rendering each as a widget with
+  // Copy/Insert/Apply actions and everything else as plain text.
+  function renderRich(body, text) {
+    body.textContent = "";
+    let lastIndex = 0;
+    let match;
+    let any = false;
+    CODE_BLOCK_RE.lastIndex = 0;
+    while ((match = CODE_BLOCK_RE.exec(text))) {
+      any = true;
+      if (match.index > lastIndex) {
+        body.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+      body.appendChild(buildCodeBlock(match[1], match[2].replace(/\n$/, "")));
+      lastIndex = CODE_BLOCK_RE.lastIndex;
+    }
+    if (!any) {
+      body.textContent = text;
+      return;
+    }
+    if (lastIndex < text.length) {
+      body.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+  }
+
+  function buildCodeBlock(lang, code) {
+    const wrap = document.createElement("div");
+    wrap.className = "codeBlock";
+
+    const header = document.createElement("div");
+    header.className = "codeBlockHeader";
+    const langEl = document.createElement("span");
+    langEl.className = "codeBlockLang";
+    langEl.textContent = lang || "code";
+    header.appendChild(langEl);
+
+    const actions = document.createElement("div");
+    actions.className = "codeBlockActions";
+    const mk = (label, action) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "codeBlockBtn";
+      b.textContent = label;
+      b.addEventListener("click", () => vscode.postMessage({ type: action, text: code }));
+      return b;
+    };
+    actions.appendChild(mk("Copy", "copyToClipboard"));
+    actions.appendChild(mk("Insert", "insertAtCursor"));
+    actions.appendChild(mk("Apply", "applyEdit"));
+    header.appendChild(actions);
+    wrap.appendChild(header);
+
+    const pre = document.createElement("pre");
+    const codeEl = document.createElement("code");
+    codeEl.textContent = code;
+    pre.appendChild(codeEl);
+    wrap.appendChild(pre);
+
+    return wrap;
   }
 
   function setBusy(value) {
@@ -45,6 +139,14 @@
 
   function renderModels(items) {
     modelSelect.innerHTML = "";
+    if (items.length === 0) {
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "No models — add a provider (⚙ or +)";
+      modelSelect.appendChild(empty);
+      lastPointer = "";
+      return;
+    }
     const groups = new Map();
     for (const item of items) {
       let group = groups.get(item.providerLabel);
@@ -60,22 +162,55 @@
       if (item.active) opt.selected = true;
       group.appendChild(opt);
     }
-    const addOpt = document.createElement("option");
-    addOpt.value = "__add__";
-    addOpt.textContent = "+ Add provider…";
-    modelSelect.appendChild(addOpt);
-    lastPointer = modelSelect.value === "__add__" ? "" : modelSelect.value;
+    lastPointer = modelSelect.value;
   }
 
   modelSelect.addEventListener("change", () => {
-    if (modelSelect.value === "__add__") {
-      modelSelect.value = lastPointer;
-      vscode.postMessage({ type: "addProvider" });
-      return;
-    }
+    if (!modelSelect.value) return;
     lastPointer = modelSelect.value;
     vscode.postMessage({ type: "selectModel", pointer: modelSelect.value });
   });
+
+  function openSettingsPanel() {
+    historyPanel.classList.add("hidden");
+    settingsPanel.classList.remove("hidden");
+    vscode.postMessage({ type: "getProviders" });
+  }
+
+  function openHistoryPanel() {
+    settingsPanel.classList.add("hidden");
+    historyPanel.classList.remove("hidden");
+  }
+
+  addModelBtn.addEventListener("click", openSettingsPanel);
+
+  newChatBtn.addEventListener("click", () => {
+    if (busy) return;
+    vscode.postMessage({ type: "newChat" });
+  });
+
+  historyBtn.addEventListener("click", () => {
+    const opening = historyPanel.classList.contains("hidden");
+    if (opening) openHistoryPanel();
+    else historyPanel.classList.add("hidden");
+  });
+
+  function renderSessions(items) {
+    sessionList.innerHTML = "";
+    for (const s of items) {
+      const row = document.createElement("div");
+      row.className = "sessionRow" + (s.active ? " active" : "");
+      const label = document.createElement("span");
+      label.textContent = s.title;
+      row.appendChild(label);
+      row.addEventListener("click", () => {
+        if (busy || s.active) return;
+        vscode.postMessage({ type: "switchSession", id: s.id });
+        historyPanel.classList.add("hidden");
+      });
+      sessionList.appendChild(row);
+    }
+  }
 
   modeBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -84,14 +219,80 @@
     });
   });
 
+  // Composer text-macros for the same quick-action prompts as the right-click
+  // menu (/fix, /tests, ...) — expanded client-side before send, no round trip.
+  const SLASH_COMMANDS = {
+    "/explain": "Explain this code.",
+    "/fix": "Find and fix the bug(s) in this code. Show the corrected code and explain the fix.",
+    "/tests": "Write unit tests for this code, covering the main cases and edge cases.",
+    "/comments": "Add clear, concise comments to this code explaining non-obvious parts. Show the commented version.",
+    "/refactor": "Refactor this code for clarity and maintainability, without changing its behavior. Show the refactored version and explain the changes.",
+  };
+
+  function expandSlashCommand(raw) {
+    const m = raw.match(/^\s*(\/[a-zA-Z]+)\s*([\s\S]*)$/);
+    if (!m) return raw;
+    const template = SLASH_COMMANDS[m[1].toLowerCase()];
+    if (!template) return raw;
+    return m[2].trim() ? template + "\n\n" + m[2].trim() : template;
+  }
+
   function submit() {
     if (busy) return;
-    const text = input.value.trim();
+    const text = expandSlashCommand(input.value.trim());
     if (!text) return;
-    addMessage("user", text);
+    const body = addMessage("user", text);
+    addTurnActions(body, "user");
     input.value = "";
     setBusy(true);
     vscode.postMessage({ type: "send", text, mode });
+  }
+
+  // "Edit & resend" (user turns) / "Regenerate" (assistant turns) — only
+  // meaningful on the latest Plan-mode exchange, since extension-side history
+  // only tracks Plan turns (agent runs live in the DOM only).
+  function isLastOfKind(row, selector) {
+    const all = messagesEl.querySelectorAll(selector);
+    return all.length > 0 && all[all.length - 1] === row;
+  }
+
+  function addTurnActions(body, role) {
+    const row = body.closest(".msg");
+    if (!row) return;
+    const bar = document.createElement("div");
+    bar.className = "turnActions";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "turnActionBtn";
+    if (role === "user") {
+      btn.textContent = "Edit & resend";
+      btn.addEventListener("click", () => editAndResend(row, body.textContent || ""));
+    } else {
+      btn.textContent = "Regenerate";
+      btn.addEventListener("click", () => regenerate(row));
+    }
+    bar.appendChild(btn);
+    row.appendChild(bar);
+  }
+
+  function editAndResend(row, text) {
+    if (busy || !isLastOfKind(row, ".msg.user")) return;
+    let node = row;
+    while (node) {
+      const next = node.nextSibling;
+      node.remove();
+      node = next;
+    }
+    input.value = text;
+    input.focus();
+    vscode.postMessage({ type: "editLastUser" });
+  }
+
+  function regenerate(row) {
+    if (busy || !isLastOfKind(row, ".msg.assistant")) return;
+    row.remove();
+    setBusy(true);
+    vscode.postMessage({ type: "regenerate" });
   }
 
   form.addEventListener("submit", (e) => {
@@ -108,12 +309,12 @@
 
   gearBtn.addEventListener("click", () => {
     const opening = settingsPanel.classList.contains("hidden");
-    settingsPanel.classList.toggle("hidden");
-    if (opening) vscode.postMessage({ type: "getProviders" });
+    if (opening) openSettingsPanel();
+    else settingsPanel.classList.add("hidden");
   });
 
   cfgKind.addEventListener("change", () => {
-    cfgApiKey.style.display = cfgKind.value === "ollama" ? "none" : "";
+    cfgApiKeyField.classList.toggle("hidden", cfgKind.value === "ollama");
   });
 
   function renderProviders(items) {
@@ -162,22 +363,30 @@
   window.addEventListener("message", (event) => {
     const msg = event.data;
     switch (msg.type) {
-      case "restore":
-        addMessage(msg.role, msg.text);
+      case "restore": {
+        const restored = addMessage(msg.role, msg.text, msg.role === "assistant");
+        if (msg.role === "user" || msg.role === "assistant") addTurnActions(restored, msg.role);
         break;
+      }
       case "info":
         addMessage("info", msg.text);
         break;
       case "start":
+        streamingText = "";
         streamingEl = addMessage("assistant", "");
         break;
       case "delta":
         if (streamingEl) {
+          streamingText += msg.text;
           streamingEl.textContent += msg.text;
           messagesEl.scrollTop = messagesEl.scrollHeight;
         }
         break;
       case "done":
+        if (streamingEl) {
+          renderRich(streamingEl, streamingText);
+          addTurnActions(streamingEl, "assistant");
+        }
         streamingEl = null;
         setBusy(false);
         break;
@@ -194,6 +403,20 @@
         break;
       case "providers":
         renderProviders(msg.items);
+        break;
+      case "sessions":
+        renderSessions(msg.items);
+        break;
+      case "clearTranscript":
+        messagesEl.innerHTML = "";
+        streamingEl = null;
+        streamingText = "";
+        break;
+      case "seed":
+        mode = "plan";
+        modeBtns.forEach((b) => b.classList.toggle("active", b.dataset.mode === "plan"));
+        input.value = msg.text;
+        submit();
         break;
     }
   });
@@ -216,8 +439,11 @@
       case "observation":
         addMessage("agent-obs", msg.text);
         break;
+      case "approval":
+        addApprovalCard(msg.tool, msg.text, msg.before, msg.after);
+        break;
       case "final":
-        addMessage("assistant", msg.text);
+        addMessage("assistant", msg.text, true);
         break;
       case "error":
         addMessage("error", msg.text);
@@ -226,6 +452,73 @@
         setBusy(false);
         break;
     }
+  }
+
+  // Inline approval prompt for a mutating tool call — Copilot/Claude-chat
+  // style (in the transcript), not a native blocking modal.
+  function addApprovalCard(tool, detail, before, after) {
+    const el = document.createElement("div");
+    el.className = "msg agent-approval";
+
+    const label = document.createElement("div");
+    label.className = "msgRole";
+    label.textContent = "Approval needed";
+    el.appendChild(label);
+
+    const body = document.createElement("div");
+    body.className = "msgBody";
+    body.textContent = tool + ": " + detail;
+    el.appendChild(body);
+
+    if (before) {
+      const pre = document.createElement("pre");
+      pre.className = "diffPreview diffBefore";
+      pre.textContent = before;
+      el.appendChild(pre);
+    }
+    if (after) {
+      const pre = document.createElement("pre");
+      pre.className = "diffPreview diffAfter";
+      pre.textContent = after;
+      el.appendChild(pre);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "approvalActions";
+    const respond = (choice, statusText) => {
+      actions.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      const status = document.createElement("div");
+      status.className = "approvalStatus";
+      status.textContent = statusText;
+      el.appendChild(status);
+      vscode.postMessage({ type: "approvalResponse", choice });
+    };
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "primary";
+    approveBtn.textContent = "Approve";
+    approveBtn.addEventListener("click", () => respond("approve", "Approved."));
+
+    const approveAllBtn = document.createElement("button");
+    approveAllBtn.type = "button";
+    approveAllBtn.textContent = "Approve all";
+    approveAllBtn.addEventListener("click", () =>
+      respond("approve-all", "Approved (auto-approving the rest of this run)."),
+    );
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "ghostBtn";
+    rejectBtn.textContent = "Reject";
+    rejectBtn.addEventListener("click", () => respond("reject", "Rejected."));
+
+    actions.appendChild(approveBtn);
+    actions.appendChild(approveAllBtn);
+    actions.appendChild(rejectBtn);
+    el.appendChild(actions);
+
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
   // Ask the extension to replay history — covers reload after the panel was

@@ -1,5 +1,5 @@
-// VS Code glue for the agent: wires a real host, a modal approval gate, and
-// webview event forwarding around the headless Agent orchestrator.
+// VS Code glue for the agent: wires a real host, a chat-inline approval gate,
+// and webview event forwarding around the headless Agent orchestrator.
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
@@ -7,35 +7,46 @@ import { Agent, AgentEvents, Approver } from "./orchestrator";
 import { VscodeAgentHost } from "./host";
 import { Checkpoint } from "./checkpoint";
 import { Tool, TOOLS } from "./tools";
+import { flashAgentEdit } from "./editDecorations";
 
 export type AgentMode = "edit" | "agent";
+export type ApprovalChoice = "approve" | "approve-all" | "reject";
+export interface ApprovalDiff {
+  before?: string;
+  after?: string;
+}
+export type RequestApproval = (
+  tool: string,
+  summary: string,
+  diff?: ApprovalDiff,
+) => Promise<ApprovalChoice>;
 
 // Edit mode drops shell access — file read/create/edit tools only, no
 // run_terminal — so "Edit" can't run arbitrary commands, only "Agent" can.
 const EDIT_MODE_TOOLS = TOOLS.filter((t) => t.name !== "run_terminal");
 
-// Approver backed by a modal dialog. "Approve all" flips auto-approve for the
-// rest of the run; a config default can pre-approve everything.
-class ModalApprover implements Approver {
+// Approver backed by an inline chat-transcript prompt (Copilot/Claude-chat
+// style) instead of a blocking native modal. "Approve all" flips auto-approve
+// for the rest of the run; a config default can pre-approve everything.
+class ChatApprover implements Approver {
   private auto: boolean;
-  constructor(autoDefault: boolean) {
+  constructor(
+    autoDefault: boolean,
+    private readonly ask: RequestApproval,
+  ) {
     this.auto = autoDefault;
   }
 
   async approve(tool: Tool, args: Record<string, unknown>): Promise<boolean> {
     if (this.auto) return true;
-    const detail = summarize(tool.name, args);
-    const choice = await vscode.window.showWarningMessage(
-      `Agent wants to run: ${tool.name}`,
-      { modal: true, detail },
-      "Approve",
-      "Approve all",
-    );
-    if (choice === "Approve all") {
+    const summary = summarize(tool.name, args);
+    const diff = buildDiffPreview(tool.name, args);
+    const choice = await this.ask(tool.name, summary, diff);
+    if (choice === "approve-all") {
       this.auto = true;
       return true;
     }
-    return choice === "Approve";
+    return choice === "approve";
   }
 }
 
@@ -52,6 +63,26 @@ function summarize(tool: string, args: Record<string, unknown>): string {
   return path;
 }
 
+const MAX_PREVIEW = 800;
+function clip(s: string): string {
+  return s.length > MAX_PREVIEW ? s.slice(0, MAX_PREVIEW) + "\n… (truncated)" : s;
+}
+
+// find/replace on edit_file (and content on create_file) already ARE a diff
+// — no need to read the file back to build the approval preview.
+function buildDiffPreview(tool: string, args: Record<string, unknown>): ApprovalDiff | undefined {
+  if (tool === "create_file") {
+    const content = typeof args.content === "string" ? args.content : "";
+    return { after: clip(content) };
+  }
+  if (tool === "edit_file") {
+    const find = typeof args.find === "string" ? args.find : undefined;
+    const replace = typeof args.replace === "string" ? args.replace : "";
+    return find === undefined ? { after: clip(replace) } : { before: clip(find), after: clip(replace) };
+  }
+  return undefined;
+}
+
 export interface AgentRun {
   checkpoint: Checkpoint;
   done: Promise<void>;
@@ -65,6 +96,8 @@ export async function runAgent(
   post: (msg: unknown) => void,
   signal: AbortSignal,
   mode: AgentMode = "agent",
+  requestApproval: RequestApproval,
+  projectRules?: string,
 ): Promise<AgentRun> {
   const resolved = await registry.resolveActive();
   if (!resolved) throw new Error("No model selected. Run 'xpreiIDE: Select Model' first.");
@@ -75,7 +108,7 @@ export async function runAgent(
     .get<boolean>("agent.autoApprove", false);
   const maxSteps = vscode.workspace
     .getConfiguration("xpreiIDE")
-    .get<number>("agent.maxSteps", 20);
+    .get<number>("agent.maxSteps", 0);
 
   const events: AgentEvents = {
     onStep: (n) => post({ type: "agent", kind: "step", n }),
@@ -84,16 +117,18 @@ export async function runAgent(
     onObservation: (t) => post({ type: "agent", kind: "observation", text: t }),
     onFinal: (t) => post({ type: "agent", kind: "final", text: t }),
     onError: (t) => post({ type: "agent", kind: "error", text: t }),
+    onEdit: (path, before, after) => flashAgentEdit(host.cwd, path, before, after),
   };
 
   const agent = new Agent({
     provider: resolved.provider,
     model: resolved.model,
     host,
-    approver: new ModalApprover(autoApprove),
+    approver: new ChatApprover(autoApprove, requestApproval),
     events,
     maxSteps,
     tools: mode === "edit" ? EDIT_MODE_TOOLS : TOOLS,
+    projectRules,
   });
 
   const done = agent.run(task, signal);

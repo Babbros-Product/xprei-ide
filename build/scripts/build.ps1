@@ -14,7 +14,8 @@ param(
   [string]$VscodeTag = "1.90.2",
   [string]$Arch = "x64",
   [switch]$SkipClone,
-  [switch]$StageOnly
+  [switch]$StageOnly,
+  [switch]$SkipNativeFix
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +38,12 @@ if (-not $StageOnly) {
   Step "Applying xpreiIDE branding"
   node (Join-Path $PSScriptRoot "patch-product.mjs") $vscodeDir
 
+  # 2b. Tiny core patch: teach the viewsContainers extension point about
+  # "auxiliarybar" so xpreiIDE-ai's chat view can live in the Secondary Side
+  # Bar (right side) instead of competing with Explorer on the left.
+  Step "Patching core: auxiliarybar viewsContainers support"
+  node (Join-Path $PSScriptRoot "patch-core.mjs") $vscodeDir
+
   # 3. Build the extension bundle. --prefix pins the working dir explicitly
   # instead of relying on Push-Location surviving into child processes.
   Step "Building xpreiIDE-ai extension"
@@ -51,7 +58,7 @@ if (-not $StageOnly) {
   # shell) with "AssignProcessToJobObject: (87)". They're runtime-only bindings
   # for enterprise policy/cert-store/logging/telemetry — unneeded to build or
   # run the editor, so skipping their install scripts is a safe workaround.
-  Step "yarn install (VS Code root) — slow, scripts skipped"
+  Step "yarn install (VS Code root) -- slow, scripts skipped"
   yarn --cwd $vscodeDir install --ignore-scripts
 
   # VS Code keeps a SEPARATE build/package.json for its own build tooling deps
@@ -68,7 +75,7 @@ if (-not $StageOnly) {
     ForEach-Object { yarn --cwd $_.Directory.FullName install --ignore-scripts }
   yarn --cwd (Join-Path $vscodeDir "extensions") install --ignore-scripts
 
-  Step "gulp vscode-win32-$Arch — slow (~30-45 min, full recompile every run)"
+  Step "gulp vscode-win32-$Arch -- slow (~30-45 min, full recompile every run)"
   yarn --cwd $vscodeDir gulp "vscode-win32-$Arch"
 }
 
@@ -76,6 +83,14 @@ if (-not $StageOnly) {
 Step "Staging xpreiIDE-ai as a built-in"
 if (-not (Test-Path $outDir)) { throw "Build output not found at $outDir. Run without -StageOnly first." }
 node (Join-Path $PSScriptRoot "stage-extension.mjs") $outDir
+
+# 6. The --ignore-scripts installs above left native modules (integrated
+# terminal, Windows policy/cert/logging bindings) uncompiled, which crashes the
+# app on launch. Compile them for real and fold them into the built app now.
+if (-not $SkipNativeFix) {
+  Step "Compiling native modules and repacking node_modules.asar"
+  & (Join-Path $PSScriptRoot "fix-native-modules.ps1") -BuiltApp $outDir
+}
 
 Write-Host "`nDone. Portable app: $outDir" -ForegroundColor Green
 Write-Host "Launch: $(Join-Path $outDir 'xpreiide.exe')" -ForegroundColor Green

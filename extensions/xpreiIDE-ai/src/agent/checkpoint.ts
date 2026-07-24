@@ -4,7 +4,7 @@
 
 import { AgentHost } from "./host";
 
-interface Snapshot {
+export interface Snapshot {
   existed: boolean;
   content: string; // prior content when existed; "" when new
 }
@@ -16,6 +16,12 @@ export class Checkpoint {
 
   get touched(): string[] {
     return [...this.snaps.keys()];
+  }
+
+  // Prior content captured for `path` (the first-touch snapshot), if any —
+  // used to build an after-the-write diff for gutter decorations.
+  getSnapshot(path: string): Snapshot | undefined {
+    return this.snaps.get(path);
   }
 
   // Record a path's prior state exactly once, before the first write to it.

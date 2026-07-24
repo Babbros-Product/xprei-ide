@@ -6,14 +6,24 @@ import { InlineEditController } from "./edit/inlineEdit";
 import { ProviderConfig } from "./providers/provider";
 import { ProviderRegistry } from "./providers/registry";
 import { runAddProviderFlow } from "./providers/addProviderFlow";
-import { ChatViewProvider } from "./ui/chat/chatView";
+import { ChatViewProvider, QuickActionKind } from "./ui/chat/chatView";
+import { generateCommitMessage } from "./git/commitMessage";
+import { InlineCompletionProvider } from "./completion/inlineCompletionProvider";
+
+const QUICK_ACTIONS: { kind: QuickActionKind; command: string }[] = [
+  { kind: "explain", command: "xpreiIDE.explainSelection" },
+  { kind: "fix", command: "xpreiIDE.fixSelection" },
+  { kind: "tests", command: "xpreiIDE.generateTests" },
+  { kind: "comments", command: "xpreiIDE.addComments" },
+  { kind: "refactor", command: "xpreiIDE.refactorSelection" },
+];
 
 export function activate(context: vscode.ExtensionContext): void {
   const registry = new ProviderRegistry(context.secrets);
   const log = vscode.window.createOutputChannel("xpreiIDE");
   const engine = new ContextEngine(registry, context.storageUri, log);
 
-  const chat = new ChatViewProvider(context.extensionUri, registry, engine);
+  const chat = new ChatViewProvider(context.extensionUri, registry, engine, context.workspaceState);
   const inlineEdit = new InlineEditController(registry);
 
   // Keep the index fresh as the user edits.
@@ -26,6 +36,10 @@ export function activate(context: vscode.ExtensionContext): void {
     log,
     watcher,
     inlineEdit,
+    vscode.languages.registerInlineCompletionItemProvider(
+      { pattern: "**" },
+      new InlineCompletionProvider(registry),
+    ),
     vscode.commands.registerCommand("xpreiIDE.inlineEdit", () => inlineEdit.run()),
     vscode.commands.registerCommand("xpreiIDE.inlineEdit.accept", () => inlineEdit.accept()),
     vscode.commands.registerCommand("xpreiIDE.inlineEdit.reject", () => inlineEdit.reject()),
@@ -50,9 +64,31 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("xpreiIDE.revertAgentRun", () =>
       chat.revertLastRun(),
     ),
+    vscode.commands.registerCommand("xpreiIDE.inlineChat", () => void inlineChat(chat)),
+    vscode.commands.registerCommand("xpreiIDE.generateCommitMessage", () =>
+      generateCommitMessage(registry),
+    ),
+    ...QUICK_ACTIONS.map(({ kind, command }) =>
+      vscode.commands.registerCommand(command, () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.selection.isEmpty) {
+          vscode.window.showInformationMessage("Select some code first.");
+          return;
+        }
+        void chat.runQuickAction(
+          kind,
+          editor.document.getText(editor.selection),
+          editor.document.languageId,
+        );
+      }),
+    ),
   );
 
   void engine.load();
+
+  // Chat lives in the Secondary Side Bar (right side) — open it on startup so
+  // it's not hidden behind an icon the user has to discover.
+  void vscode.commands.executeCommand("workbench.view.extension.xpreiIDE");
 }
 
 export function deactivate(): void {
@@ -155,6 +191,25 @@ async function setApiKey(registry: ProviderRegistry): Promise<void> {
 
   await registry.setApiKey(picked.id, key);
   vscode.window.showInformationMessage(`Stored API key for ${picked.label}.`);
+}
+
+// Ctrl+I: a native input box (no floating-widget infra needed) that seeds a
+// free-typed question into the chat panel, with the current selection (if
+// any) attached as context — Cmd-K's ask-only sibling.
+async function inlineChat(chat: ChatViewProvider): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  const hasSelection = !!editor && !editor.selection.isEmpty;
+  const prompt = await vscode.window.showInputBox({
+    prompt: hasSelection ? "Ask xpreiIDE about the selection" : "Ask xpreiIDE",
+    placeHolder: "e.g. what does this function do, how would I test this",
+    ignoreFocusOut: true,
+  });
+  if (!prompt) return;
+  if (hasSelection && editor) {
+    await chat.askFreeform(prompt, editor.document.getText(editor.selection), editor.document.languageId);
+  } else {
+    await chat.askFreeform(prompt);
+  }
 }
 
 async function pickProvider(

@@ -4,6 +4,7 @@
   "description": "Bring-your-own-model AI assistant. Chat with local Ollama or any OpenAI-compatible endpoint.",
   "version": "0.0.1",
   "publisher": "xpreiIDE",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -13,10 +14,12 @@
     "Other"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "auxiliarybar": [
         {
           "id": "xpreiIDE",
           "title": "xpreiIDE",
@@ -69,9 +72,79 @@
       {
         "command": "xpreiIDE.revertAgentRun",
         "title": "xpreiIDE: Revert Last Agent Run"
+      },
+      {
+        "command": "xpreiIDE.explainSelection",
+        "title": "xpreiIDE: Explain Selection"
+      },
+      {
+        "command": "xpreiIDE.fixSelection",
+        "title": "xpreiIDE: Fix Selection"
+      },
+      {
+        "command": "xpreiIDE.generateTests",
+        "title": "xpreiIDE: Generate Tests for Selection"
+      },
+      {
+        "command": "xpreiIDE.addComments",
+        "title": "xpreiIDE: Add Comments to Selection"
+      },
+      {
+        "command": "xpreiIDE.refactorSelection",
+        "title": "xpreiIDE: Refactor Selection"
+      },
+      {
+        "command": "xpreiIDE.inlineChat",
+        "title": "xpreiIDE: Inline Chat"
+      },
+      {
+        "command": "xpreiIDE.generateCommitMessage",
+        "title": "xpreiIDE: Generate Commit Message"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "xpreiIDE.explainSelection",
+          "when": "editorHasSelection",
+          "group": "xpreiIDE@1"
+        },
+        {
+          "command": "xpreiIDE.fixSelection",
+          "when": "editorHasSelection",
+          "group": "xpreiIDE@2"
+        },
+        {
+          "command": "xpreiIDE.generateTests",
+          "when": "editorHasSelection",
+          "group": "xpreiIDE@3"
+        },
+        {
+          "command": "xpreiIDE.addComments",
+          "when": "editorHasSelection",
+          "group": "xpreiIDE@4"
+        },
+        {
+          "command": "xpreiIDE.refactorSelection",
+          "when": "editorHasSelection",
+          "group": "xpreiIDE@5"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "xpreiIDE.generateCommitMessage",
+          "when": "scmProvider == git",
+          "group": "navigation"
+        }
+      ]
+    },
     "keybindings": [
+      {
+        "command": "xpreiIDE.inlineChat",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "editorTextFocus"
+      },
       {
         "command": "xpreiIDE.inlineEdit",
         "key": "ctrl+k",
@@ -127,13 +200,18 @@
         },
         "xpreiIDE.agent.maxSteps": {
           "type": "number",
-          "default": 20,
-          "description": "Maximum tool-call steps the agent takes before stopping a run."
+          "default": 0,
+          "description": "Maximum tool-call steps per agent run. 0 = unlimited (stops only when the model finishes or you hit Stop)."
         },
         "xpreiIDE.agent.autoApprove": {
           "type": "boolean",
           "default": false,
           "description": "Skip the approval prompt for file writes and terminal commands during agent runs. Use with caution."
+        },
+        "xpreiIDE.completions.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show ghost-text inline completions from the active model as you type."
         }
       }
     }
@@ -143,7 +221,7 @@
     "watch": "npm run compile -- --sourcemap --watch",
     "vscode:prepublish": "npm run compile -- --minify",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/edit/prompt.test.ts src/agent/protocol.test.ts src/agent/tools.test.ts src/agent/checkpoint.test.ts src/agent/orchestrator.test.ts src/providers/presets.test.ts src/providers/modelList.test.ts"
+    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/edit/prompt.test.ts src/agent/protocol.test.ts src/agent/tools.test.ts src/agent/checkpoint.test.ts src/agent/orchestrator.test.ts src/providers/presets.test.ts src/providers/modelList.test.ts src/agent/pathResolve.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

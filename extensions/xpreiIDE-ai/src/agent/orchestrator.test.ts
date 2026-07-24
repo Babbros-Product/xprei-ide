@@ -127,6 +127,23 @@ test("agent stops after maxSteps when the model never finishes", async () => {
   assert.ok(log.some((l) => l.startsWith("final:Stopped after 3 steps")));
 });
 
+test("maxSteps 0 (or omitted) runs unlimited — no premature stop past the old default cap", async () => {
+  const host = new FakeHost({ "a.ts": "x" });
+  const { events, log } = recorder();
+  const toolCalls = Array.from({ length: 25 }, () => '{"tool":"read_file","args":{"path":"a.ts"}}');
+  const agent = new Agent({
+    provider: new ScriptedProvider([...toolCalls, '{"final":"done after 25 steps"}']),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+    // maxSteps omitted — defaults to unlimited.
+  });
+  await agent.run("do a lot of steps");
+  assert.ok(log.includes("final:done after 25 steps"));
+  assert.ok(!log.some((l) => l.startsWith("final:Stopped after")));
+});
+
 test("a restricted tool set rejects tools outside it", async () => {
   const host = new FakeHost({ "a.ts": "x" });
   const readOnly: Tool[] = [

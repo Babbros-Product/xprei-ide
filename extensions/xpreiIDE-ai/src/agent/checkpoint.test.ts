@@ -32,3 +32,18 @@ test("note snapshots each path only once (first state wins)", async () => {
   assert.equal(host.files.get("a.ts"), "v1");
   assert.deepEqual(cp.touched, ["a.ts"]);
 });
+
+test("getSnapshot exposes the prior content for a noted path", async () => {
+  const host = new FakeHost({ "a.ts": "original" });
+  const cp = new Checkpoint(host);
+  await cp.note("a.ts");
+  assert.deepEqual(cp.getSnapshot("a.ts"), { existed: true, content: "original" });
+  assert.equal(cp.getSnapshot("never-touched.ts"), undefined);
+});
+
+test("getSnapshot reports existed:false for a newly created path", async () => {
+  const host = new FakeHost();
+  const cp = new Checkpoint(host);
+  await cp.note("new.ts");
+  assert.deepEqual(cp.getSnapshot("new.ts"), { existed: false, content: "" });
+});

@@ -4,7 +4,7 @@
 //
 //   node build/scripts/patch-product.mjs <path-to-vscode-checkout>
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,3 +25,17 @@ Object.assign(product, branding);
 
 writeFileSync(productPath, JSON.stringify(product, null, "\t") + "\n");
 console.log(`Patched ${productPath} with xpreiIDE branding + Open VSX gallery.`);
+
+// App icons (win32/darwin/linux "code.*"), generated once from the xprei.online
+// favicon — overwrite Code-OSS's stock icons so a full gulp rebuild bakes in
+// the branded icon without any manual step.
+const iconDir = join(root, "build", "resources", "icons");
+const iconTargets = [
+  ["code.ico", join(vscodeDir, "resources", "win32", "code.ico")],
+  ["code.icns", join(vscodeDir, "resources", "darwin", "code.icns")],
+  ["code.png", join(vscodeDir, "resources", "linux", "code.png")],
+];
+for (const [name, dest] of iconTargets) {
+  copyFileSync(join(iconDir, name), dest);
+}
+console.log(`Patched ${iconTargets.length} branded app icons into ${vscodeDir}/resources.`);

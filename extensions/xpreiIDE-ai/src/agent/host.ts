@@ -5,6 +5,7 @@
 import * as vscode from "vscode";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
+import { resolveWorkspacePath } from "./pathResolve";
 
 const execAsync = promisify(execCb);
 
@@ -51,7 +52,9 @@ export class VscodeAgentHost implements AgentHost {
   }
 
   private resolve(rel: string): vscode.Uri {
-    return vscode.Uri.joinPath(this.root, rel);
+    const resolved = resolveWorkspacePath(this.root.fsPath, rel);
+    if ("error" in resolved) throw new Error(resolved.error);
+    return vscode.Uri.joinPath(this.root, resolved.relPath);
   }
 
   async readFile(path: string): Promise<string> {

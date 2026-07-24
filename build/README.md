@@ -45,6 +45,14 @@ First build takes tens of minutes and downloads a lot; later builds are faster.
 2. **`patch-product.mjs`** merges `product.branding.json` into the checkout's
    `product.json` (name, win32/darwin identifiers, Open VSX gallery URLs). Shallow
    top-level merge — every other upstream field is preserved.
+2b. **`patch-core.mjs`** — the one deliberate exception to "no core diff": adds
+   `auxiliarybar` as a valid `viewsContainers` contribution target in
+   `viewsExtensionPoint.ts`. Stock 1.90.2 only exposes `activitybar`/`panel` to
+   extensions even though the Secondary Side Bar (`ViewContainerLocation.AuxiliaryBar`)
+   already exists in core — this is what lets the chat view live on the right
+   instead of the left activity bar. ~10 lines, idempotent (safe on a reused
+   `-SkipClone` checkout), errors loudly if the pinned VS Code version changes
+   this file underneath it.
 3. **Build the extension** (`npm run compile -- --minify`) → `dist/extension.js`.
 4. **Build the product** (`yarn && yarn gulp vscode-<platform>`).
 5. **`stage-extension.mjs`** copies the extension's runtime files (`dist`, `media`,
@@ -65,11 +73,23 @@ cd build/vscode
 yarn gulp vscode-win32-x64-inno-setup     # needs Inno Setup on PATH
 ```
 
+## App icons
+
+`build/resources/icons/` holds the branded app icon (`code.ico`/`code.icns`/
+`code.png`), generated from the `xprei.online` favicon. `patch-product.mjs`
+copies these over Code-OSS's stock `resources/{win32,darwin,linux}/code.*` on
+every build, so a full `gulp vscode-win32-x64` rebuild bakes the icon in
+automatically — no manual step needed.
+
+To refresh a build's `.exe` icon **without** a full 30-45 min rebuild, swap it
+directly with `rcedit` (already a dependency inside `build/vscode/node_modules`):
+
+```powershell
+node -e "require('./build/vscode/node_modules/rcedit')('build/VSCode-win32-x64/xpreiIDE.exe', { icon: 'build/resources/icons/code.ico' }, (e) => { if (e) throw e; })"
+```
+
 ## Not done yet (deliberately deferred)
 
-- **Icons.** `product.branding.json` names the icons but the actual `.ico`/`.icns`/
-  PNG assets aren't in the repo — the build uses stock Code-OSS icons until we drop
-  branded assets into the checkout's `resources/` during patch step.
 - **Deep-UI patches.** Agent-first sidebar / inline ghost UI would be a `patches/`
   series applied after clone. Not needed for v1 — the extension already delivers
   chat, @context, Cmd-K, and the agent.

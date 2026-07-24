@@ -38,7 +38,20 @@ build/                      # P0 branded-distro build tooling (scaffold only)
 - **P0 branded distro build** — **done**. `build/VSCode-win32-x64/xpreiIDE.exe`
   built and staged with `xpreiIDE-ai` as a built-in. See `build/README.md` and
   the build status below for how the native-module blocker was worked around.
-- **P5 polish** — not started (per-role models, weak-model handling, telemetry).
+- **P5 polish** — in progress. Done: chat lives in the Secondary Side Bar
+  (right side, via `build/scripts/patch-core.mjs`'s `auxiliarybar` core patch)
+  and opens automatically on startup; quick actions (Explain/Fix/Tests/Comments/
+  Refactor via right-click or `/slash` commands, seeded into chat); `.xpreiIDErules`
+  project-instructions file; chat code-block actions (Copy/Insert/Apply);
+  Edit & resend / Regenerate on the latest turn; named/persistent chat sessions
+  (Plan-mode history only); agent approval cards show a real before/after diff;
+  agent-written files get a brief gutter flash if open; inline chat (Ctrl+I);
+  commit-message generation from the staged diff (SCM title button); ghost-text
+  inline completions (ties up any configured model via `chatStream`, not a
+  dedicated FIM endpoint — quality is model-gated). Still open: per-role models,
+  weak-model handling, telemetry, diff-preview-before-apply for multi-file agent
+  runs (current design proposes edits one at a time, ReAct-style — a true
+  upfront batch preview would need an orchestrator redesign).
 
 ## P0 build status (this machine) — DONE
 
@@ -135,4 +148,7 @@ list in `package.json`.
 - Unbounded chat history (no trimming yet).
 - Inline edit applies once on completion, not token-by-token into the buffer.
 - Agent feeds observations as `user` turns (not a `tool` role) for OSS compatibility.
-- P0: branded icon assets not in repo; installer/signing/auto-update not wired.
+- P0: installer/signing/auto-update not wired. Branded icons (from
+  `xprei.online`'s favicon) are in `build/resources/icons/`, wired into
+  `patch-product.mjs`, and already applied to the staged `xpreiIDE.exe` via
+  `rcedit` — see `build/README.md`.
