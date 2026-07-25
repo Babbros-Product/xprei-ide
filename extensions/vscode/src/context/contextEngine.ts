@@ -13,7 +13,9 @@ import {
   FileContext,
   formatFiles,
   formatHits,
+  formatProblems,
   MIN_SCORE,
+  ProblemInfo,
   SegmentTier,
   TRUNCATION_MARKER,
 } from "@xprei/core";
@@ -140,10 +142,12 @@ export class ContextEngine {
   // Turn parsed mentions into a context message, or "" if nothing to add.
   // contextWindow is the resolved provider's token-count capability — used
   // to size the context block via budgetContext() instead of blindly
-  // concatenating everything the mentions resolved to. Files are a
-  // higher-priority "break" tier (explicit user request, truncate-and-stop
-  // on overflow); @codebase hits are a lower-priority "skip" tier
-  // (relevance guess, skip oversized hits and keep checking smaller ones).
+  // concatenating everything the mentions resolved to. Tier priority
+  // (highest to lowest): @file: ("break", explicit request) > @problems
+  // ("skip", compact and actionable) > @open ("break", bulkier, ordered
+  // like files) > @codebase hits ("skip", a relevance guess). Every tier
+  // is built unconditionally (even when empty) — budgetContext's return
+  // value is positionally aligned with the input tier array.
   async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
@@ -159,8 +163,21 @@ export class ContextEngine {
       }
     }
 
+    const openFiles = mentions.open
+      ? await this.readOpenFiles(new Set(files.map((f) => f.path)))
+      : [];
+    const problems = mentions.problems ? this.readProblems() : [];
+
     const fileTier: SegmentTier = {
       segments: files.map((f) => ({ text: f.content, data: f })),
+      strategy: "break",
+    };
+    const problemTier: SegmentTier = {
+      segments: problems.map((p) => ({ text: formatProblems([p]), data: p })),
+      strategy: "skip",
+    };
+    const openTier: SegmentTier = {
+      segments: openFiles.map((f) => ({ text: f.content, data: f })),
       strategy: "break",
     };
     const eligibleHits = hits.filter((h) => h.score >= MIN_SCORE);
@@ -169,9 +186,19 @@ export class ContextEngine {
       strategy: "skip",
     };
 
-    const [keptFileSegs, keptHitSegs] = budgetContext([fileTier, hitTier], contextWindow);
+    const [keptFileSegs, keptProblemSegs, keptOpenSegs, keptHitSegs] = budgetContext(
+      [fileTier, problemTier, openTier, hitTier],
+      contextWindow,
+    );
 
     const budgetedFiles: FileContext[] = keptFileSegs.map((seg) => ({
+      ...(seg.data as FileContext),
+      content: seg.text,
+    }));
+    // "skip" never truncates a whole diagnostic (each one is its own
+    // segment), so seg.data is used raw.
+    const budgetedProblems: ProblemInfo[] = keptProblemSegs.map((seg) => seg.data as ProblemInfo);
+    const budgetedOpenFiles: FileContext[] = keptOpenSegs.map((seg) => ({
       ...(seg.data as FileContext),
       content: seg.text,
     }));
@@ -179,8 +206,11 @@ export class ContextEngine {
     // If this tier ever becomes "break", reconstruct from seg.text like files do.
     const budgetedHits: SearchHit[] = keptHitSegs.map((seg) => seg.data as SearchHit);
 
+    const allFiles = [...budgetedFiles, ...budgetedOpenFiles];
+
     return buildContextMessage({
-      files: budgetedFiles.length ? formatFiles(budgetedFiles, Number.POSITIVE_INFINITY) : undefined,
+      files: allFiles.length ? formatFiles(allFiles, Number.POSITIVE_INFINITY) : undefined,
+      problems: budgetedProblems.length ? formatProblems(budgetedProblems) : undefined,
       retrieved: budgetedHits.length ? formatHits(budgetedHits, Number.NEGATIVE_INFINITY) : undefined,
     });
   }
@@ -210,6 +240,62 @@ export class ContextEngine {
         out.push({ path: this.rel(uri), content });
       } catch {
         // ignore unreadable / missing
+      }
+    }
+    return out;
+  }
+
+  // Every open tab's resolved workspace-relative path, across all tab
+  // groups (including background ones the user isn't currently looking
+  // at). Shared by readOpenFiles() and readProblems() so both derive
+  // "what's open" from one vscode.window.tabGroups.all pass.
+  private openTabPaths(): { uri: vscode.Uri; path: string }[] {
+    const out: { uri: vscode.Uri; path: string }[] = [];
+    for (const group of vscode.window.tabGroups.all) {
+      for (const tab of group.tabs) {
+        if (tab.input instanceof vscode.TabInputText) {
+          out.push({ uri: tab.input.uri, path: this.rel(tab.input.uri) });
+        }
+      }
+    }
+    return out;
+  }
+
+  // Read every open tab's content, excluding any path already covered by
+  // an explicit @file: mention (that file is inlined once, via the file
+  // tier).
+  private async readOpenFiles(excludePaths: Set<string>): Promise<FileContext[]> {
+    const out: FileContext[] = [];
+    for (const { uri, path } of this.openTabPaths()) {
+      if (excludePaths.has(path)) continue;
+      try {
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        const raw = Buffer.from(bytes).toString("utf8");
+        const content =
+          raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) + TRUNCATION_MARKER : raw;
+        out.push({ path, content });
+      } catch {
+        // ignore unreadable / missing
+      }
+    }
+    return out;
+  }
+
+  // Error/warning diagnostics scoped to files currently open in a tab —
+  // "what's broken in front of me right now," not the whole workspace.
+  private readProblems(): ProblemInfo[] {
+    const openPaths = new Set(this.openTabPaths().map((t) => t.path));
+
+    const out: ProblemInfo[] = [];
+    for (const [uri, diagnostics] of vscode.languages.getDiagnostics()) {
+      const path = this.rel(uri);
+      if (!openPaths.has(path)) continue;
+      for (const d of diagnostics) {
+        if (d.severity === vscode.DiagnosticSeverity.Error) {
+          out.push({ path, line: d.range.start.line + 1, severity: "error", message: d.message });
+        } else if (d.severity === vscode.DiagnosticSeverity.Warning) {
+          out.push({ path, line: d.range.start.line + 1, severity: "warning", message: d.message });
+        }
       }
     }
     return out;
