@@ -316,16 +316,26 @@ export class ContextEngine {
     return out;
   }
 
-  // The current working-tree state vs. the last commit: unstaged plus
-  // staged changes, combined — matches the agent loop's view_diff tool's
-  // `git diff HEAD` semantics. "" if there's no git repo, nothing has
-  // changed, or the vscode.git extension isn't available.
+  // The current working-tree state, staged and unstaged changes reported
+  // separately (each vs. its own base — index vs HEAD for staged, working
+  // tree vs index for unstaged) since vscode.git's API has no single call
+  // that returns a whole-tree-vs-HEAD patch string. "" if there's no git
+  // repo, nothing has changed, or the vscode.git extension isn't available.
   private async readDiff(): Promise<string> {
-    const api = await getGitApi();
-    const repo = api?.repositories[0];
-    if (!repo) return "";
-    const [unstaged, staged] = await Promise.all([repo.diff(false), repo.diff(true)]);
-    return [unstaged, staged].filter(Boolean).join("\n");
+    try {
+      const api = await getGitApi();
+      const repo = api?.repositories[0];
+      if (!repo) return "";
+      const [unstaged, staged] = await Promise.all([repo.diff(false), repo.diff(true)]);
+      return [
+        staged.trim() ? `// Staged changes (index vs HEAD):\n${staged}` : "",
+        unstaged.trim() ? `// Unstaged changes (working tree vs index):\n${unstaged}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+    } catch {
+      return ""; // no repo / unborn HEAD / git failure — @diff contributes nothing
+    }
   }
 
   private resolveRel(p: string): vscode.Uri | undefined {
