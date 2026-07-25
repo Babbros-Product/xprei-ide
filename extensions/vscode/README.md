@@ -93,7 +93,7 @@ Set an embedding model (**xpreiIDE: Select Embedding Model**, e.g.
 in chat use `@codebase <question>` for semantic retrieval or `@file:src/x.ts` to
 inline a specific file. The index updates as you edit.
 
-Five more mentions need no indexing at all:
+Six more mentions need no indexing at all:
 - **`@open`** — inline every file you currently have open in an editor tab
   (including background tabs you're not looking at right now).
 - **`@problems`** — inline the current error/warning diagnostics for your
@@ -112,6 +112,12 @@ Five more mentions need no indexing at all:
   that resolve to your own machine or local network (localhost, private
   IP ranges, cloud metadata endpoints) are silently ignored — if `@url:`
   contributes nothing, that's why.
+- **`@repomap`** — inline a lightweight overview of exported/public
+  top-level symbols (functions, classes, etc.) across your workspace's
+  TypeScript, JavaScript, and Python files, so the model gets a sense of
+  what's where without you opening every file. It's a regex-based
+  summary, not a full dependency graph — other languages and re-exported/
+  aliased symbols aren't covered.
 
 Combine any of these in one message, e.g. `@diff @problems review my changes`.
 
