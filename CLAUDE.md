@@ -98,10 +98,17 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
   (`xpreiIDE.agent.protocolRetries`, default 2 — corrective reprompt + visible
   retry indicator instead of silently ending the run on unparseable output;
   design: `docs/superpowers/specs/2026-07-25-weak-model-protocol-retry-design.md`).
-  Still open: per-role models, telemetry, diff-preview-before-apply for
-  multi-file agent runs (design spec written and approved:
+  Still open: telemetry, diff-preview-before-apply for multi-file agent
+  runs (design spec written and approved:
   `docs/superpowers/specs/2026-07-24-diff-preview-before-apply-design.md` —
   implementation not started).
+- **Post-P5 backlog** (`docs/feature-roadmap.md`) — Phase 1 (`read_file_range`,
+  `glob_search`, `view_diff` agent tools) done; Phase 2a (local Ollama
+  auto-discovery on activation) done; Phase 2b (per-role models —
+  `completionModel`/`agentModel`/`inlineEditModel`/`commitMessageModel`,
+  each falling back to `activeModel`) done. Remaining phases (3 onward:
+  context-window budgeting, richer context providers, `multi_edit`, shared
+  config, MCP, true FIM, CLI extension) not started.
 - **Marketplace publish** — not started. Extension is publish-ready
   (`package.json` has publisher/license/icon/categories/keywords,
   `.vscodeignore` and `LICENSE` present, `vscode:prepublish` runs the
