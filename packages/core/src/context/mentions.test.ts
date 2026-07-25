@@ -31,3 +31,32 @@ test("duplicate file mentions are de-duplicated", () => {
   const m = parseMentions("@file:a.ts and again @a.ts");
   assert.deepEqual(m.files, ["a.ts"]);
 });
+
+test("@open sets the flag and is stripped from the query", () => {
+  const m = parseMentions("what's wrong with this @open please");
+  assert.equal(m.open, true);
+  assert.equal(m.cleaned, "what's wrong with this please");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@problems sets the flag and is stripped from the query", () => {
+  const m = parseMentions("fix the errors @problems now");
+  assert.equal(m.problems, true);
+  assert.equal(m.cleaned, "fix the errors now");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@open, @problems, @codebase, and @file: can all be combined", () => {
+  const m = parseMentions("@open @problems @codebase check @file:a.ts too");
+  assert.equal(m.open, true);
+  assert.equal(m.problems, true);
+  assert.equal(m.codebase, true);
+  assert.deepEqual(m.files, ["a.ts"]);
+  assert.equal(m.cleaned, "check too");
+});
+
+test("neither @open nor @problems is set when absent", () => {
+  const m = parseMentions("just a normal question");
+  assert.equal(m.open, false);
+  assert.equal(m.problems, false);
+});
