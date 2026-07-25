@@ -100,7 +100,7 @@ export async function runAgent(
   requestApproval: RequestApproval,
   projectRules?: string,
 ): Promise<AgentRun> {
-  const resolved = await registry.resolveActive();
+  const resolved = await registry.resolveAgent();
   if (!resolved) throw new Error("No model selected. Run 'xpreiIDE: Select Model' first.");
 
   const host = VscodeAgentHost.create();

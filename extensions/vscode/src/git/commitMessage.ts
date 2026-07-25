@@ -47,7 +47,7 @@ export async function generateCommitMessage(registry: ProviderRegistry): Promise
     return;
   }
 
-  const resolved = await registry.resolveActive();
+  const resolved = await registry.resolveCommitMessage();
   if (!resolved) {
     vscode.window.showWarningMessage("No model selected. Run 'xpreiIDE: Select Model' first.");
     return;

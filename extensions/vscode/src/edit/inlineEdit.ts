@@ -85,7 +85,7 @@ export class InlineEditController {
     original: string,
     instruction: string,
   ): Promise<string> {
-    const resolved = await this.registry.resolveActive();
+    const resolved = await this.registry.resolveInlineEdit();
     if (!resolved) {
       throw new Error("No model selected. Run 'xpreiIDE: Select Model' first.");
     }

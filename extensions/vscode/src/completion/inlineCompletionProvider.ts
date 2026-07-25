@@ -45,7 +45,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     const settled = await this.debounce(token);
     if (!settled || token.isCancellationRequested) return undefined;
 
-    const resolved = await this.registry.resolveActive().catch(() => undefined);
+    const resolved = await this.registry.resolveCompletion().catch(() => undefined);
     if (!resolved) return undefined;
 
     const prefix = prefixText(document, position);
