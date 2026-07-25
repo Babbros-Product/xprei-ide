@@ -110,10 +110,10 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
   budgeting) done; Phase 4's foundation sub-project (generalizing
   `budgetContext()` from hardcoded files/hits into a provider-agnostic
   tier/segment model, groundwork for the six upcoming context providers)
-  done. Phase 4a-4e (the six actual providers — `@terminal`, `@problems`,
-  `@diff`, `@open`, `@url`, repo-map) not started yet. Remaining phases (5
-  onward: `multi_edit`, shared config, MCP, true FIM, CLI extension) not
-  started.
+  done. Phase 4a (`@problems`, `@open`) done. Phase 4b-4e (the remaining
+  context providers — `@terminal`, `@diff`, `@url`, repo-map) not started
+  yet. Remaining phases (5 onward: `multi_edit`, shared config, MCP, true
+  FIM, CLI extension) not started.
 - **Marketplace publish** — not started. Extension is publish-ready
   (`package.json` has publisher/license/icon/categories/keywords,
   `.vscodeignore` and `LICENSE` present, `vscode:prepublish` runs the

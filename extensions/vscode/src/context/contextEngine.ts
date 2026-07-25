@@ -267,10 +267,13 @@ export class ContextEngine {
   private async readOpenFiles(excludePaths: Set<string>): Promise<FileContext[]> {
     const out: FileContext[] = [];
     for (const { uri, path } of this.openTabPaths()) {
+      if (isExcludedPath(path)) continue;
       if (excludePaths.has(path)) continue;
       try {
-        const bytes = await vscode.workspace.fs.readFile(uri);
-        const raw = Buffer.from(bytes).toString("utf8");
+        const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+        const raw = doc
+          ? doc.getText()
+          : Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
         const content =
           raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) + TRUNCATION_MARKER : raw;
         out.push({ path, content });

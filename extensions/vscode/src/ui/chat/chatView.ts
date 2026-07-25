@@ -331,8 +331,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     this.history.push({ role: "user", content: trimmed });
 
-    // Resolve @codebase / @file mentions into a context block. Failures here
-    // (e.g. embed model unset) degrade gracefully to a plain chat.
+    // Resolve @codebase / @file: / @open / @problems mentions into a context
+    // block. Failures here (e.g. embed model unset) degrade gracefully to a
+    // plain chat.
     let contextBlock = "";
     try {
       contextBlock = await this.context.buildContext(
