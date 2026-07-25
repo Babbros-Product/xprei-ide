@@ -31,3 +31,10 @@ export * from "./agent/orchestrator";
 
 // Standalone-sidecar host (Node fs/exec implementation of AgentHost)
 export * from "./host/nodeHost";
+
+// Sidecar JSON-RPC server (chat + agent over a transport-agnostic session).
+// The stdio entrypoint (./server/stdio) is intentionally NOT re-exported here:
+// it has a top-level side effect (auto-start when run directly) that would
+// defeat tree-shaking and pull the sidecar into every barrel consumer. Import
+// it directly (or run it) instead.
+export * from "./server/session";
