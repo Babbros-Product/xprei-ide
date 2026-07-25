@@ -11,7 +11,7 @@ import { ChatMessage, Provider } from "../providers/provider";
 import { Checkpoint } from "./checkpoint";
 import { AgentHost } from "./host";
 import { Action, buildAgentSystemPrompt, parseAction } from "./protocol";
-import { Tool, TOOLS, toolByName } from "./tools";
+import { Tool, TOOLS } from "./tools";
 
 export interface AgentEvents {
   onStep(n: number): void;
@@ -129,8 +129,8 @@ export class Agent {
   }
 
   private async runTool(action: Extract<Action, { kind: "tool" }>): Promise<string> {
-    const tool = toolByName(action.tool);
-    if (!tool || !this.tools.includes(tool)) {
+    const tool = this.tools.find((t) => t.name === action.tool);
+    if (!tool) {
       return `Error: unknown tool "${action.tool}". Available: ${this.tools
         .map((t) => t.name)
         .join(", ")}.`;

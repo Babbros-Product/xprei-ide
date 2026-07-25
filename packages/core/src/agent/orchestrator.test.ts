@@ -241,3 +241,30 @@ test("agent gives up with onError after exceeding the protocol-retry cap", async
   assert.match(errorLine!, /after 3 attempts/);
   assert.match(errorLine!, /garbage/);
 });
+
+test("a tool in deps.tools but NOT in the static TOOLS array is callable", async () => {
+  const customTool: Tool = {
+    name: "custom_echo",
+    description: "test-only tool",
+    args: "{}",
+    mutating: false,
+    async run() {
+      return { observation: "echoed" };
+    },
+  };
+  const host = new FakeHost();
+  const { events, log } = recorder();
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      '{"tool":"custom_echo","args":{}}',
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+    tools: [customTool],
+  });
+  await agent.run("task");
+  assert.ok(log.includes("obs:echoed"));
+});
