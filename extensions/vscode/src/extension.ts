@@ -26,6 +26,46 @@ type ModelSetting =
   | "inlineEditModel"
   | "commitMessageModel";
 
+interface RoleEntry {
+  label: string;
+  setting: ModelSetting;
+  role: string;
+  fallbackSetting?: "activeModel";
+}
+
+const ROLES: RoleEntry[] = [
+  { label: "Chat", setting: "activeModel", role: "chat" },
+  {
+    label: "Completions",
+    setting: "completionModel",
+    role: "completion",
+    fallbackSetting: "activeModel",
+  },
+  { label: "Agent", setting: "agentModel", role: "agent", fallbackSetting: "activeModel" },
+  {
+    label: "Inline Edit (Cmd/Ctrl+K)",
+    setting: "inlineEditModel",
+    role: "inline edit",
+    fallbackSetting: "activeModel",
+  },
+  {
+    label: "Commit Message",
+    setting: "commitMessageModel",
+    role: "commit message",
+    fallbackSetting: "activeModel",
+  },
+  { label: "Embeddings", setting: "embedModel", role: "embedding" },
+];
+
+async function selectRoleModel(registry: ProviderRegistry): Promise<void> {
+  const picked = await vscode.window.showQuickPick(
+    ROLES.map((r) => ({ label: r.label, entry: r })),
+    { placeHolder: "Select which role to configure a model for" },
+  );
+  if (!picked) return;
+  await selectModel(registry, picked.entry.setting, picked.entry.role, picked.entry.fallbackSetting);
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   const registry = new ProviderRegistry(context.secrets);
   const log = vscode.window.createOutputChannel("xpreiIDE");
@@ -81,6 +121,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand("xpreiIDE.selectEmbedModel", () =>
       selectModel(registry, "embedModel", "embedding"),
+    ),
+    vscode.commands.registerCommand("xpreiIDE.selectRoleModel", () =>
+      selectRoleModel(registry),
     ),
     vscode.commands.registerCommand("xpreiIDE.setApiKey", () =>
       setApiKey(registry),

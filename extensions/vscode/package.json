@@ -61,6 +61,10 @@
         "title": "xpreiIDE: Select Embedding Model"
       },
       {
+        "command": "xpreiIDE.selectRoleModel",
+        "title": "xpreiIDE: Select Model for Role..."
+      },
+      {
         "command": "xpreiIDE.setApiKey",
         "title": "xpreiIDE: Set Provider API Key"
       },
@@ -212,6 +216,26 @@
           "type": "string",
           "default": "",
           "description": "Embedding model for the codebase index, formatted 'providerId::modelName' (e.g. 'ollama-local::nomic-embed-text'). Set via 'xpreiIDE: Select Embedding Model'."
+        },
+        "xpreiIDE.completionModel": {
+          "type": "string",
+          "default": "",
+          "description": "Model for inline ghost-text completions, formatted 'providerId::modelName'. Empty falls back to xpreiIDE.activeModel. Set via 'xpreiIDE: Select Model for Role...'."
+        },
+        "xpreiIDE.agentModel": {
+          "type": "string",
+          "default": "",
+          "description": "Model for the agent's multi-step tool loop, formatted 'providerId::modelName'. Empty falls back to xpreiIDE.activeModel. Set via 'xpreiIDE: Select Model for Role...'."
+        },
+        "xpreiIDE.inlineEditModel": {
+          "type": "string",
+          "default": "",
+          "description": "Model for inline edit (Cmd/Ctrl+K), formatted 'providerId::modelName'. Empty falls back to xpreiIDE.activeModel. Set via 'xpreiIDE: Select Model for Role...'."
+        },
+        "xpreiIDE.commitMessageModel": {
+          "type": "string",
+          "default": "",
+          "description": "Model for commit-message generation, formatted 'providerId::modelName'. Empty falls back to xpreiIDE.activeModel. Set via 'xpreiIDE: Select Model for Role...'."
         },
         "xpreiIDE.agent.maxSteps": {
           "type": "number",
