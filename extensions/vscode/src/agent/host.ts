@@ -121,7 +121,7 @@ export class VscodeAgentHost implements AgentHost {
           }),
         );
       },
-      (abs) => vscode.workspace.asRelativePath(vscode.Uri.file(abs), false),
+      (abs) => vscode.workspace.asRelativePath(vscode.Uri.file(abs), false).replace(/\\/g, "/"),
       (a, b) => vscode.Uri.joinPath(vscode.Uri.file(a), b).fsPath,
       (rel) => isExcludedPath(rel),
       MAX_GLOB_RESULTS,
