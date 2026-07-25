@@ -9,11 +9,12 @@ import { chunkFile, Chunk } from "@xprei/core";
 import { hasContextRequest, Mentions } from "@xprei/core";
 import {
   buildContextMessage,
+  budgetContext,
   FileContext,
   formatFiles,
   formatHits,
 } from "@xprei/core";
-import { VectorStore } from "@xprei/core";
+import { VectorStore, SearchHit } from "@xprei/core";
 import { isExcludedPath, SCAN_EXCLUDE } from "@xprei/core";
 
 const INDEX_FILE = "index.json";
@@ -133,24 +134,29 @@ export class ContextEngine {
   }
 
   // Turn parsed mentions into a context message, or "" if nothing to add.
-  async buildContext(mentions: Mentions): Promise<string> {
+  // contextWindow is the resolved provider's token-count capability — used
+  // to size the context block via budgetContext() instead of blindly
+  // concatenating everything the mentions resolved to.
+  async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
 
     const files = await this.readFiles(mentions.files);
-    let retrieved = "";
+    let hits: SearchHit[] = [];
 
     if (mentions.codebase && this.store.size > 0 && mentions.cleaned) {
       const embedder = await this.embedder();
       if (embedder && embedder.key === this.store.modelKey) {
         const [qv] = await embedder.embed([mentions.cleaned]);
-        if (qv) retrieved = formatHits(this.store.search(qv, RETRIEVE_K));
+        if (qv) hits = this.store.search(qv, RETRIEVE_K);
       }
     }
 
+    const budgeted = budgetContext(files, hits, contextWindow);
+
     return buildContextMessage({
-      files: files.length ? formatFiles(files) : undefined,
-      retrieved: retrieved || undefined,
+      files: budgeted.files.length ? formatFiles(budgeted.files, Number.POSITIVE_INFINITY) : undefined,
+      retrieved: budgeted.hits.length ? formatHits(budgeted.hits) : undefined,
     });
   }
 
