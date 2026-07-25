@@ -74,13 +74,17 @@ async function probeModels(
 }
 
 async function setActiveModel(providerId: string, model: string): Promise<void> {
-  await vscode.workspace
-    .getConfiguration("xpreiIDE")
-    .update(
-      "activeModel",
-      ProviderRegistry.formatActive(providerId, model),
-      vscode.ConfigurationTarget.Global,
-    );
+  try {
+    await vscode.workspace
+      .getConfiguration("xpreiIDE")
+      .update(
+        "activeModel",
+        ProviderRegistry.formatActive(providerId, model),
+        vscode.ConfigurationTarget.Global,
+      );
+  } catch {
+    return;
+  }
   vscode.window.showInformationMessage(
     `xpreiIDE: using Ollama's ${model}. Change anytime with 'xpreiIDE: Select Model'.`,
   );
