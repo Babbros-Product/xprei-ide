@@ -1,0 +1,11 @@
+{
+  "name": "xprei-ide",
+  "version": "0.0.1",
+  "private": true,
+  "description": "xpreiIDE — bring-your-own-model AI coding assistant for every IDE. A Babbros product.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "extensions/*"
+  ]
+}

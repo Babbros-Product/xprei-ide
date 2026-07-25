@@ -3,10 +3,10 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
-import { Agent, AgentEvents, Approver } from "./orchestrator";
+import { Agent, AgentEvents, Approver } from "@xprei/core";
 import { VscodeAgentHost } from "./host";
-import { Checkpoint } from "./checkpoint";
-import { Tool, TOOLS } from "./tools";
+import { Checkpoint } from "@xprei/core";
+import { Tool, TOOLS } from "@xprei/core";
 import { flashAgentEdit } from "./editDecorations";
 
 export type AgentMode = "edit" | "agent";

@@ -7,10 +7,12 @@ on stock VS Code.
 
 ## Run it (dev)
 
+This extension is part of an npm-workspaces monorepo; the platform-neutral engine
+lives in `@xprei/core` (`packages/core`). Install from the **repo root**:
+
 ```bash
-cd extensions/xpreiIDE-ai
-npm install
-npm run watch      # esbuild bundles to dist/extension.js, rebuilds on change
+npm install                          # repo root — links @xprei/core
+npm run watch -w xpreiIDE-ai         # esbuild bundles dist/extension.js, rebuilds on change
 ```
 
 Then press **F5** in VS Code to launch an Extension Development Host.

@@ -5,16 +5,16 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
-import { chunkFile, Chunk } from "./chunking";
-import { hasContextRequest, Mentions } from "./mentions";
+import { chunkFile, Chunk } from "@xprei/core";
+import { hasContextRequest, Mentions } from "@xprei/core";
 import {
   buildContextMessage,
   FileContext,
   formatFiles,
   formatHits,
-} from "./retrieval";
-import { VectorStore } from "./vectorstore";
-import { isExcludedPath, SCAN_EXCLUDE } from "./exclude";
+} from "@xprei/core";
+import { VectorStore } from "@xprei/core";
+import { isExcludedPath, SCAN_EXCLUDE } from "@xprei/core";
 
 const INDEX_FILE = "index.json";
 const EMBED_BATCH = 64;

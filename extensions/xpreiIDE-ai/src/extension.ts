@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import { ContextEngine } from "./context/contextEngine";
 import { InlineEditController } from "./edit/inlineEdit";
-import { ProviderConfig } from "./providers/provider";
+import { ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "./providers/registry";
 import { runAddProviderFlow } from "./providers/addProviderFlow";
 import { ChatViewProvider, QuickActionKind } from "./ui/chat/chatView";

@@ -4,7 +4,7 @@
 // undo for agent runs).
 
 import * as vscode from "vscode";
-import { resolveWorkspacePath } from "./pathResolve";
+import { resolveWorkspacePath } from "@xprei/core";
 
 const FLASH_MS = 2500;
 

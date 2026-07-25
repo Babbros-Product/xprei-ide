@@ -1,36 +1,14 @@
-// AgentHost — the seam between agent tools and the environment. Tools call this
-// interface, never vscode/fs directly, so the tool layer is unit-testable with a
-// fake host. The VS Code implementation lives at the bottom.
+// VS Code implementation of the core AgentHost seam. The interface itself lives
+// in @xprei/core so the agent brain stays platform-neutral; this binds it to
+// vscode.workspace.fs / child_process. (The standalone sidecar ships its own
+// Node-fs host instead.)
 
 import * as vscode from "vscode";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
-import { resolveWorkspacePath } from "./pathResolve";
+import { AgentHost, ExecResult, GrepHit, resolveWorkspacePath } from "@xprei/core";
 
 const execAsync = promisify(execCb);
-
-export interface GrepHit {
-  file: string;
-  line: number;
-  text: string;
-}
-
-export interface ExecResult {
-  stdout: string;
-  stderr: string;
-  code: number;
-}
-
-export interface AgentHost {
-  readonly cwd: string;
-  readFile(path: string): Promise<string>;
-  writeFile(path: string, content: string): Promise<void>;
-  deleteFile(path: string): Promise<void>;
-  exists(path: string): Promise<boolean>;
-  listDir(path: string): Promise<string[]>;
-  grep(query: string, path?: string): Promise<GrepHit[]>;
-  exec(command: string): Promise<ExecResult>;
-}
 
 const MAX_GREP_HITS = 50;
 const GREP_EXCLUDE = "{**/node_modules/**,**/.git/**,**/dist/**,**/out/**}";

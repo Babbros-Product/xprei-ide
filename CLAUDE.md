@@ -41,16 +41,30 @@ Dropped 2026-07-25 in favor of shipping as a normal extension:
 
 ## Layout
 
+npm-workspaces monorepo (root `package.json`, workspaces `packages/*` +
+`extensions/*`). The platform-neutral core was extracted from the extension in
+Phase 0 of the multi-IDE plan (see `docs/multi-ide-plan.md`) so it can be reused
+by future JetBrains/Eclipse plugins via a shared Node sidecar.
+
 ```
-extensions/xpreiIDE-ai/     # the extension — the whole product
-  src/providers/            # provider.ts, ollama.ts, openai-compat.ts, registry.ts
-  src/context/               # chunking, vectorstore, mentions, retrieval, contextEngine, projectRules
-  src/edit/                  # Cmd-K inline edit (prompt.ts, inlineEdit.ts)
-  src/agent/                 # protocol, tools, host, checkpoint, orchestrator, runner, editDecorations, pathResolve
-  src/completion/            # ghost-text inline completions
-  src/git/                   # SCM commit-message generation
-  src/ui/chat/ + media/      # chat webview
-docs/superpowers/specs/     # design specs (brainstorming skill output)
+packages/core/             # @xprei/core — platform-neutral, no vscode import
+  src/providers/           # provider.ts, ollama.ts, openai-compat.ts, presets.ts, modelList.ts
+  src/context/             # chunking, vectorstore, retrieval, mentions, exclude (RAG substrate)
+  src/edit/                # prompt.ts (inline-edit prompt builder)
+  src/agent/               # protocol, tools, checkpoint, orchestrator, pathResolve, host (interface)
+  src/index.ts             # barrel — the public API the extension imports
+  # ALL unit tests live here now (71, run: npm test -w @xprei/core)
+extensions/xpreiIDE-ai/    # the VS Code platform layer — imports @xprei/core
+  src/providers/           # registry.ts, addProviderFlow.ts (config/secrets/QuickPick)
+  src/context/             # contextEngine.ts, projectRules.ts (vscode.fs/index persistence)
+  src/edit/                # inlineEdit.ts (Cmd-K diff decorations)
+  src/agent/               # host.ts (VscodeAgentHost), runner.ts, editDecorations.ts
+  src/completion/          # ghost-text inline completions
+  src/git/                 # SCM commit-message generation
+  src/ui/chat/ + media/    # chat webview
+plugins/intellij/          # JetBrains plugin — planned (multi-IDE plan Phase 2)
+plugins/eclipse/           # Eclipse plugin — planned (Phase 3)
+docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 ```
 
 ## Phase status
@@ -80,24 +94,33 @@ docs/superpowers/specs/     # design specs (brainstorming skill output)
   Open VSX `ovsx publish`) needs the user's own publisher account/PAT — not
   done by the agent.
 
-## Working in the extension
+## Working in the monorepo
 
 ```
-cd extensions/xpreiIDE-ai
-npm install
-npm run typecheck        # tsc --noEmit
-npm test                 # node --import tsx --test  (65 tests, all pure/headless)
-npm run compile          # esbuild → dist/extension.js
+npm install                          # from repo ROOT — links @xprei/core into the extension
+npm test -w @xprei/core              # 71 tests, all pure/headless (node --import tsx --test)
+npm run typecheck -w @xprei/core     # core tsc --noEmit
+npm run typecheck -w xpreiIDE-ai     # extension tsc --noEmit (resolves @xprei/core via workspace)
+npm run compile -w xpreiIDE-ai       # esbuild → dist/extension.js (inlines @xprei/core from source)
 # then F5 in VS Code for an Extension Development Host
 ```
 
+**All unit tests live in `@xprei/core`** (the pure modules moved there in Phase 0).
 Tests are dependency-free: pure modules + fakes (`_fakehost.ts`, provider mocks).
 No test needs a live model. When adding a test file, add it to the `test` script
-list in `package.json`.
+list in `packages/core/package.json`. The extension itself has no unit tests (its
+coupled/UI layer is verified by typecheck + compile + manual smoke).
 
-Package a local `.vsix` to test install: `npx vsce package` from
-`extensions/xpreiIDE-ai` (needs `vsce` — `npm install -g @vscode/vsce` or
-`npx` pulls it on demand).
+`@xprei/core` is a **source-only** workspace package: its `exports` point at
+`src/index.ts`, so both tsc and esbuild consume the TypeScript directly — no
+separate core build step. It's an extension **devDependency** (bundled by esbuild
+at compile time, not a runtime dep).
+
+Package a local `.vsix`: from `extensions/xpreiIDE-ai`,
+`npx @vscode/vsce package --no-dependencies`. The `--no-dependencies` flag is
+**required** in this workspace — without it vsce follows the `@xprei/core`
+symlink and tries to package the whole repo. Safe because esbuild has already
+inlined the core into `dist/extension.js`.
 
 ## Environment gotchas (this machine)
 

@@ -3,7 +3,7 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
-import { stripCodeFences } from "../edit/prompt";
+import { stripCodeFences } from "@xprei/core";
 
 // Minimal ambient typing for the subset of the built-in "vscode.git"
 // extension's API this module uses — that extension ships no public .d.ts.

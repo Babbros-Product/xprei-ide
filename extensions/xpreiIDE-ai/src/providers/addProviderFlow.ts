@@ -4,8 +4,7 @@
 // "+ Add provider…" picker entry — one implementation, two entry points.
 
 import * as vscode from "vscode";
-import { PRESETS, uniqueProviderId } from "./presets";
-import { ProviderConfig } from "./provider";
+import { PRESETS, ProviderConfig, uniqueProviderId } from "@xprei/core";
 import { ProviderRegistry } from "./registry";
 
 type AddChoice =

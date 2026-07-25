@@ -3,10 +3,14 @@
 // SecretStorage so they never touch plaintext config.
 
 import * as vscode from "vscode";
-import { OllamaProvider } from "./ollama";
-import { OpenAICompatProvider } from "./openai-compat";
-import { Provider, ProviderConfig } from "./provider";
-import { aggregateModels, ModelEntry } from "./modelList";
+import {
+  aggregateModels,
+  ModelEntry,
+  OllamaProvider,
+  OpenAICompatProvider,
+  Provider,
+  ProviderConfig,
+} from "@xprei/core";
 
 const SECRET_PREFIX = "xpreiIDE.apiKey.";
 

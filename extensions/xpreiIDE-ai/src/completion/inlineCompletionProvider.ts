@@ -7,7 +7,7 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
-import { stripCodeFences } from "../edit/prompt";
+import { stripCodeFences } from "@xprei/core";
 
 const DEBOUNCE_MS = 400;
 const MAX_PREFIX_LINES = 60;

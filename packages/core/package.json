@@ -1,0 +1,22 @@
+{
+  "name": "@xprei/core",
+  "version": "0.0.1",
+  "description": "Platform-neutral bring-your-own-model + agent core for xpreiIDE.",
+  "license": "MIT",
+  "publisher": "xpreiIDE",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/context/exclude.test.ts src/edit/prompt.test.ts src/agent/protocol.test.ts src/agent/tools.test.ts src/agent/checkpoint.test.ts src/agent/orchestrator.test.ts src/providers/presets.test.ts src/providers/modelList.test.ts src/agent/pathResolve.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.4.0"
+  }
+}

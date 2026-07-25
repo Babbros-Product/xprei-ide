@@ -235,12 +235,12 @@
     "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "npm run compile -- --sourcemap --watch",
     "vscode:prepublish": "npm run compile -- --minify",
-    "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/context/exclude.test.ts src/edit/prompt.test.ts src/agent/protocol.test.ts src/agent/tools.test.ts src/agent/checkpoint.test.ts src/agent/orchestrator.test.ts src/providers/presets.test.ts src/providers/modelList.test.ts src/agent/pathResolve.test.ts"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
+    "@xprei/core": "*",
     "esbuild": "^0.21.0",
     "tsx": "^4.16.0",
     "typescript": "^5.4.0"

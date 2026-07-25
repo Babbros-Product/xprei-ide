@@ -4,7 +4,7 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
-import { buildEditMessages, stripCodeFences } from "./prompt";
+import { buildEditMessages, stripCodeFences } from "@xprei/core";
 
 const CONTEXT_KEY = "xpreiIDE.inlineEditActive";
 const CONTEXT_LINES = 20;

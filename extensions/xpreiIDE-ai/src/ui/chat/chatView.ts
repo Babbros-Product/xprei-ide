@@ -2,13 +2,13 @@
 // user messages to the active provider's streaming API.
 
 import * as vscode from "vscode";
-import { Checkpoint } from "../../agent/checkpoint";
+import { Checkpoint } from "@xprei/core";
 import { AgentMode, ApprovalChoice, ApprovalDiff, runAgent } from "../../agent/runner";
 import { ContextEngine } from "../../context/contextEngine";
-import { parseMentions } from "../../context/mentions";
-import { ChatMessage, isAbortError, ProviderConfig } from "../../providers/provider";
+import { parseMentions } from "@xprei/core";
+import { ChatMessage, isAbortError, ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "../../providers/registry";
-import { uniqueProviderId } from "../../providers/presets";
+import { uniqueProviderId } from "@xprei/core";
 import { loadProjectRules } from "../../context/projectRules";
 
 // Plan mode has no file-editing tools at all (plain chat), so the model is
