@@ -120,6 +120,20 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: "glob_search",
+    description:
+      "Find files by glob pattern (supports *, **, ?). Optionally scope to a path.",
+    args: '{ "pattern": string, "path"?: string }',
+    mutating: false,
+    async run(args, host) {
+      const pattern = str(args, "pattern");
+      if (!pattern) return { observation: "Error: 'pattern' is required." };
+      const matches = await host.glob(pattern, str(args, "path"));
+      if (!matches.length) return { observation: `No files match "${pattern}".` };
+      return { observation: truncate(matches.join("\n")) };
+    },
+  },
+  {
     name: "create_file",
     description: "Create or overwrite a file with the given content.",
     args: '{ "path": string, "content": string }',

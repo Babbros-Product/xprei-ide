@@ -97,3 +97,29 @@ test("read_file_range reports a missing file", async () => {
   const r = await tool("read_file_range").run({ path: "nope.ts", startLine: 1, endLine: 2 }, new FakeHost());
   assert.match(r.observation, /Error/);
 });
+
+test("glob_search returns matching paths", async () => {
+  const host = new FakeHost({ "src/a.ts": "x", "src/b.js": "x", "test/c.ts": "x" });
+  const r = await tool("glob_search").run({ pattern: "**/*.ts" }, host);
+  assert.match(r.observation, /src\/a\.ts/);
+  assert.match(r.observation, /test\/c\.ts/);
+  assert.doesNotMatch(r.observation, /b\.js/);
+});
+
+test("glob_search scopes to an optional path", async () => {
+  const host = new FakeHost({ "src/a.ts": "x", "test/b.ts": "x" });
+  const r = await tool("glob_search").run({ pattern: "**/*.ts", path: "src" }, host);
+  assert.match(r.observation, /src\/a\.ts/);
+  assert.doesNotMatch(r.observation, /test\/b\.ts/);
+});
+
+test("glob_search reports no matches", async () => {
+  const host = new FakeHost({ "a.ts": "x" });
+  const r = await tool("glob_search").run({ pattern: "*.md" }, host);
+  assert.match(r.observation, /No files match/);
+});
+
+test("glob_search errors on missing pattern", async () => {
+  const r = await tool("glob_search").run({}, new FakeHost());
+  assert.match(r.observation, /Error/);
+});
