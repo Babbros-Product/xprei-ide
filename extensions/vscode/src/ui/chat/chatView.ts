@@ -335,7 +335,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // (e.g. embed model unset) degrade gracefully to a plain chat.
     let contextBlock = "";
     try {
-      contextBlock = await this.context.buildContext(parseMentions(trimmed));
+      contextBlock = await this.context.buildContext(
+        parseMentions(trimmed),
+        resolved.provider.capabilities.contextWindow,
+      );
     } catch (err) {
       this.post({ type: "info", text: `Context skipped: ${errText(err)}` });
     }
