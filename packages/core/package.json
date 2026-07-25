@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "sidecar": "node --import tsx src/server/stdio.ts",
     "build:sidecar": "esbuild src/server/stdio.ts --bundle --outfile=dist/sidecar.cjs --platform=node --format=cjs --target=node18",
-    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/context/retrieval.test.ts src/context/budget.test.ts src/context/exclude.test.ts src/edit/prompt.test.ts src/agent/protocol.test.ts src/agent/glob.test.ts src/agent/tools.test.ts src/agent/checkpoint.test.ts src/agent/orchestrator.test.ts src/providers/presets.test.ts src/providers/modelList.test.ts src/agent/pathResolve.test.ts src/host/nodeHost.test.ts src/server/session.test.ts src/server/harness.test.ts src/server/sidecarBundle.test.ts"
+    "test": "node --import tsx --test src/providers/ollama.test.ts src/providers/openai-compat.test.ts src/context/chunking.test.ts src/context/vectorstore.test.ts src/context/mentions.test.ts src/context/retrieval.test.ts src/context/budget.test.ts src/context/exclude.test.ts src/context/urlSafety.test.ts src/context/htmlStrip.test.ts src/edit/prompt.test.ts src/agent/protocol.test.ts src/agent/glob.test.ts src/agent/tools.test.ts src/agent/checkpoint.test.ts src/agent/orchestrator.test.ts src/providers/presets.test.ts src/providers/modelList.test.ts src/agent/pathResolve.test.ts src/host/nodeHost.test.ts src/server/session.test.ts src/server/harness.test.ts src/server/sidecarBundle.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

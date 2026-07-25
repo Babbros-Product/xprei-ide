@@ -18,6 +18,8 @@ export * from "./context/retrieval";
 export * from "./context/budget";
 export * from "./context/mentions";
 export * from "./context/exclude";
+export * from "./context/urlSafety";
+export * from "./context/htmlStrip";
 
 // Inline-edit prompt building
 export * from "./edit/prompt";
