@@ -239,4 +239,5 @@ test("agent gives up with onError after exceeding the protocol-retry cap", async
   const errorLine = log.find((l) => l.startsWith("error:"));
   assert.ok(errorLine, "expected an error: log entry");
   assert.match(errorLine!, /after 3 attempts/);
+  assert.match(errorLine!, /garbage/);
 });

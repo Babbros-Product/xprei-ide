@@ -60,8 +60,10 @@ const MISSING_KEY_REASON =
   '{"tool": "<name>", "args": {...}}. To finish: {"final": "<summary>"}.';
 
 // Extract the model's action from a raw completion. Tolerant of fenced blocks
-// and surrounding prose. If nothing parses as an action, treat the whole reply
-// as a final answer so the loop never hangs on a chatty model.
+// and surrounding prose. If nothing parses as an action, return a
+// protocolError (a retry-eligible protocol violation) rather than silently
+// treating the reply as a final answer — callers (the orchestrator) retry up
+// to a configurable cap before giving up.
 export function parseAction(raw: string): Action {
   const text = raw.trim();
   const obj = extractJsonObject(text);

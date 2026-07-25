@@ -97,9 +97,11 @@ export class Agent {
       if (action.kind === "protocolError") {
         protocolFailures++;
         if (protocolFailures > protocolRetries) {
+          const attemptWord = protocolFailures === 1 ? "attempt" : "attempts";
           this.deps.events.onError(
-            `Model did not return a valid response after ${protocolFailures} attempts ` +
-              `(${action.reason}). Try a different/larger model, or raise xpreiIDE.agent.protocolRetries.`,
+            `Model did not return a valid response after ${protocolFailures} ${attemptWord} ` +
+              `(${action.reason}). Try a different/larger model, or raise xpreiIDE.agent.protocolRetries.\n` +
+              `Last reply: ${raw.slice(0, 300)}`,
           );
           return;
         }
