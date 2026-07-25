@@ -1,55 +1,52 @@
-// Fits @file:-inlined files and @codebase hits into a char budget derived
-// from the provider's token-count contextWindow. No tokenizer dependency —
+// Fits an ordered list of tiers into a char budget derived from the
+// provider's token-count contextWindow. No tokenizer dependency —
 // CHARS_PER_TOKEN is a hand-written heuristic, matching this repo's
-// dependency-free philosophy (see tools.ts's MAX_OBS for the same pattern).
-// Files always win over hits: an explicit @file: request beats a relevance
-// guess. The first file that overflows the remaining budget is truncated;
-// any files after it are dropped. Remaining budget (if any) goes to hits
-// in their existing score-sorted order, skipping (not stopping at) any hit
-// too large to fit, so a smaller lower-scored hit still gets a chance.
-
-import { FileContext, MIN_SCORE } from "./retrieval";
-import { SearchHit } from "./vectorstore";
+// dependency-free philosophy (see tools.ts's MAX_OBS for the same
+// pattern). Tier order is priority: the first tier's segments are
+// considered before any later tier gets a share of the remaining budget.
+// Each tier picks one of two fill strategies — "break" truncates the
+// first segment that overflows and drops everything after it in that
+// tier (but later tiers still get whatever budget remains); "skip"
+// skips any oversized segment and keeps checking smaller ones after it.
+// Segments carry an opaque `data` payload so any provider (files, search
+// hits, or a future Phase 4 provider) can round-trip its own shape
+// through this generic utility — callers downcast `data` back to their
+// own type immediately after budgeting.
 
 export const CHARS_PER_TOKEN = 4;
 export const CONTEXT_BLOCK_FRACTION = 0.5;
+export const TRUNCATION_MARKER = "\n…(truncated)";
 
-export interface BudgetedContext {
-  files: FileContext[];
-  hits: SearchHit[];
+export interface WeightedSegment {
+  text: string;
+  data: unknown;
 }
 
-export function budgetContext(
-  files: FileContext[],
-  hits: SearchHit[],
-  contextWindow: number,
-): BudgetedContext {
+export type FillStrategy = "break" | "skip";
+
+export interface SegmentTier {
+  segments: WeightedSegment[];
+  strategy: FillStrategy;
+}
+
+export function budgetContext(tiers: SegmentTier[], contextWindow: number): WeightedSegment[][] {
   const rawBudget = contextWindow * CHARS_PER_TOKEN * CONTEXT_BLOCK_FRACTION;
-  const totalBudget = Number.isFinite(rawBudget) ? Math.max(0, Math.floor(rawBudget)) : 0;
-  let remaining = totalBudget;
+  let remaining = Number.isFinite(rawBudget) ? Math.max(0, Math.floor(rawBudget)) : 0;
 
-  const keptFiles: FileContext[] = [];
-  for (const f of files) {
-    if (remaining <= 0) break;
-    if (f.content.length <= remaining) {
-      keptFiles.push(f);
-      remaining -= f.content.length;
-    } else {
-      keptFiles.push({ path: f.path, content: f.content.slice(0, remaining) + "\n…(truncated)" });
-      remaining = 0;
-      break;
+  return tiers.map((tier) => {
+    const kept: WeightedSegment[] = [];
+    for (const seg of tier.segments) {
+      if (remaining <= 0) break;
+      if (seg.text.length <= remaining) {
+        kept.push(seg);
+        remaining -= seg.text.length;
+      } else if (tier.strategy === "break") {
+        kept.push({ text: seg.text.slice(0, remaining) + TRUNCATION_MARKER, data: seg.data });
+        remaining = 0;
+        break;
+      }
+      // "skip" strategy: oversized segment is simply not pushed; loop continues.
     }
-  }
-
-  const eligible = hits.filter((h) => h.score >= MIN_SCORE);
-  const keptHits: SearchHit[] = [];
-  for (const h of eligible) {
-    const size = h.chunk.text.length;
-    if (size <= remaining) {
-      keptHits.push(h);
-      remaining -= size;
-    }
-  }
-
-  return { files: keptFiles, hits: keptHits };
+    return kept;
+  });
 }
