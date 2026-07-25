@@ -166,6 +166,8 @@ configuration (runtime workbench).
 - **Streaming chat** with Plan / Edit / Agent modes and named sessions.
 - **Bring-your-own-model** — local Ollama or any OpenAI-compatible endpoint; API
   keys stored in your OS keychain, never in plaintext settings.
+- **Zero-config local setup** — a running Ollama daemon is detected on
+  startup and offered in one click; nothing to configure by hand.
 - **Per-role models** — use a different model for chat, completions, the
   agent, inline edit, and commit messages (`xpreiIDE: Select Model for
   Role...`); any role left unconfigured follows the chat model.

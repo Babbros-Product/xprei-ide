@@ -21,8 +21,28 @@ Then press **F5** in VS Code to launch an Extension Development Host.
 
 1. Start a model backend — e.g. `ollama serve` and `ollama pull llama3.1`.
 2. Open the **xpreiIDE** icon in the activity bar → Chat panel.
-3. Run **xpreiIDE: Select Model** (Command Palette) → pick provider → pick model.
+3. If a local Ollama daemon is already running, xpreiIDE detects it on
+   startup and offers to use it — accept the prompt and you're done.
+   Otherwise run **xpreiIDE: Select Model** (Command Palette) → pick
+   provider → pick model.
 4. Type and hit Enter. Tokens stream in.
+
+## Automatic Ollama setup
+
+When no chat model is configured yet, xpreiIDE checks on startup whether a
+local Ollama daemon is running at `http://localhost:11434`. If it finds
+one:
+
+- **One model installed** — it's selected automatically, and a notification
+  tells you which.
+- **Several installed** — a notification offers to use Ollama; accept it
+  and pick a model from the list.
+- **Ollama running, no models pulled** — a notification suggests running
+  `ollama pull llama3.1`.
+
+If Ollama isn't running, nothing happens at all — no prompt, no error. The
+check stops entirely once a chat model is set, and you can always change
+the model later with **xpreiIDE: Select Model**.
 
 ## Add a hosted / custom model
 
