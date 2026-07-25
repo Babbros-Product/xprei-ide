@@ -32,8 +32,9 @@ Two of the three need no `AgentHost` interface change at all:
 
 One needs a new host method:
 
-- **`glob_search`** adds `glob(pattern: string): Promise<string[]>` to
-  `AgentHost` (`packages/core/src/agent/host.ts`). Implemented via one shared,
+- **`glob_search`** adds `glob(pattern: string, path?: string): Promise<string[]>`
+  to `AgentHost` (`packages/core/src/agent/host.ts`) — the optional `path`
+  scopes the search root, mirroring `grep(query, path?)`'s existing shape. Implemented via one shared,
   dependency-free glob matcher (new module `packages/core/src/agent/glob.ts`,
   pure and unit-tested — same "pure module in @xprei/core" pattern as
   `exclude.ts`), reused by **all three** host implementations
@@ -93,7 +94,7 @@ One needs a new host method:
 
 ## Files touched
 
-- `packages/core/src/agent/host.ts` — add `glob()` to `AgentHost`.
+- `packages/core/src/agent/host.ts` — add `glob(pattern, path?)` to `AgentHost`.
 - `packages/core/src/agent/glob.ts` **(new)** — pure `matchGlob(pattern, path): boolean`
   plus a shared recursive-walk helper usable by both real hosts.
 - `packages/core/src/agent/glob.test.ts` **(new)** — matcher unit tests: `*`,
