@@ -28,3 +28,6 @@ export * from "./agent/protocol";
 export * from "./agent/tools";
 export * from "./agent/checkpoint";
 export * from "./agent/orchestrator";
+
+// Standalone-sidecar host (Node fs/exec implementation of AgentHost)
+export * from "./host/nodeHost";
