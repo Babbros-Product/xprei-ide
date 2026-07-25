@@ -93,13 +93,16 @@ Set an embedding model (**xpreiIDE: Select Embedding Model**, e.g.
 in chat use `@codebase <question>` for semantic retrieval or `@file:src/x.ts` to
 inline a specific file. The index updates as you edit.
 
-Two more mentions need no indexing at all:
+Three more mentions need no indexing at all:
 - **`@open`** — inline every file you currently have open in an editor tab
   (including background tabs you're not looking at right now).
 - **`@problems`** — inline the current error/warning diagnostics for your
   open files, so the model can see what's broken without you pasting it in.
+- **`@diff`** — inline your current git diff (staged and unstaged
+  changes combined), so the model can review or explain your in-progress
+  work without you copy-pasting a diff.
 
-Combine any of these in one message, e.g. `@open @problems why is this failing?`.
+Combine any of these in one message, e.g. `@diff @problems review my changes`.
 
 ## Inline edit (Cmd-K)
 

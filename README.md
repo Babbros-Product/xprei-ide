@@ -175,8 +175,8 @@ configuration (runtime workbench).
   smaller open-source models (no reliance on native function-calling), with
   approval gates and one-click revert.
 - **Codebase-aware context** — `@codebase` semantic retrieval, `@file:`
-  mentions, `@open` (every open tab), and `@problems` (current
-  error/warning diagnostics).
+  mentions, `@open` (every open tab), `@problems` (current error/warning
+  diagnostics), and `@diff` (your current git diff).
 - **Inline edit** — select code, describe a change, review a red/green diff.
 - **Ghost-text completions**, **commit-message generation**, and right-click quick
   actions (Explain / Fix / Tests / Comments / Refactor).
