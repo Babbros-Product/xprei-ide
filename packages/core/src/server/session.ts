@@ -43,7 +43,10 @@ interface Request {
   params?: Record<string, unknown>;
 }
 
-const EDIT_MODE_TOOLS = TOOLS.filter((t) => t.name !== "run_terminal");
+// Edit mode drops shell/exec access — file read/create/edit tools only, no
+// run_terminal or view_diff (both spawn a subprocess) — so "Edit" can't run
+// arbitrary commands, only "Agent" can.
+const EDIT_MODE_TOOLS = TOOLS.filter((t) => t.name !== "run_terminal" && t.name !== "view_diff");
 
 export class SidecarSession {
   private workspaceRoot = process.cwd();

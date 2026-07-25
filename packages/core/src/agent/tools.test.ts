@@ -124,6 +124,26 @@ test("glob_search errors on missing pattern", async () => {
   assert.match(r.observation, /Error/);
 });
 
+test("glob_search: path scopes the walk root but pattern still matches the full relative path", async () => {
+  const host = new FakeHost({ "src/a.ts": "x" });
+  const scoped = await tool("glob_search").run({ pattern: "*.ts", path: "src" }, host);
+  assert.match(scoped.observation, /No files match/); // bare "*.ts" doesn't match "src/a.ts"
+  const correct = await tool("glob_search").run({ pattern: "**/*.ts", path: "src" }, host);
+  assert.match(correct.observation, /src\/a\.ts/);
+});
+
+test("glob_search notes when the 200-result cap is reached, not at 199", async () => {
+  const files199: Record<string, string> = {};
+  for (let i = 0; i < 199; i++) files199[`f${i}.ts`] = "x";
+  const under = await tool("glob_search").run({ pattern: "*.ts" }, new FakeHost(files199));
+  assert.doesNotMatch(under.observation, /cap reached/);
+
+  const files200: Record<string, string> = {};
+  for (let i = 0; i < 200; i++) files200[`f${i}.ts`] = "x";
+  const at = await tool("glob_search").run({ pattern: "*.ts" }, new FakeHost(files200));
+  assert.match(at.observation, /200-result cap reached/);
+});
+
 test("view_diff runs git diff HEAD and returns its stdout", async () => {
   const host = new FakeHost();
   host.execResult = { stdout: "diff --git a/x.ts b/x.ts\n+added line\n", stderr: "", code: 0 };

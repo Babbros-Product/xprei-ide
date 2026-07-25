@@ -7,6 +7,14 @@ import { ToolSpec } from "./protocol";
 
 const MAX_OBS = 8000; // cap observation length so a huge file can't blow context
 
+// Mirrors the MAX_GLOB_RESULTS cap each AgentHost.glob() implementation applies
+// (packages/core/src/host/nodeHost.ts, extensions/vscode/src/agent/host.ts).
+// Not imported from there (it's a private per-host constant) — this is the
+// threshold at which glob_search's observation itself flags the result list
+// as possibly truncated, so the model doesn't mistake "200 results" for
+// "exactly 200 results, complete."
+const GLOB_CAP_HINT_THRESHOLD = 200;
+
 export interface ToolResult {
   observation: string;
   // Paths this tool wrote, so the orchestrator can snapshot for revert.
@@ -122,7 +130,10 @@ export const TOOLS: Tool[] = [
   {
     name: "glob_search",
     description:
-      "Find files by glob pattern (supports *, **, ?). Optionally scope to a path.",
+      'Find files by glob pattern (supports *, **, ?). The pattern matches the full ' +
+      'workspace-relative path (e.g. use "**/*.ts" or "src/*.ts", not bare "*.ts", to ' +
+      "match nested files). Optional 'path' only narrows which directory is walked, it " +
+      "does not change what the pattern matches against.",
     args: '{ "pattern": string, "path"?: string }',
     mutating: false,
     async run(args, host) {
@@ -130,7 +141,11 @@ export const TOOLS: Tool[] = [
       if (!pattern) return { observation: "Error: 'pattern' is required." };
       const matches = await host.glob(pattern, str(args, "path"));
       if (!matches.length) return { observation: `No files match "${pattern}".` };
-      return { observation: truncate(matches.join("\n")) };
+      let observation = matches.join("\n");
+      if (matches.length >= GLOB_CAP_HINT_THRESHOLD) {
+        observation += `\n… (${GLOB_CAP_HINT_THRESHOLD}-result cap reached; narrow the pattern for a complete list)`;
+      }
+      return { observation: truncate(observation) };
     },
   },
   {
@@ -201,7 +216,9 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "view_diff",
-    description: "Show the current git diff (working tree + staged changes vs HEAD).",
+    description:
+      "Show the current git diff (working tree + staged changes vs HEAD). Only shows " +
+      "changes to files git already tracks — newly created untracked files won't appear here.",
     args: "{}",
     mutating: false,
     async run(_args, host) {

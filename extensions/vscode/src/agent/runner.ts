@@ -21,9 +21,10 @@ export type RequestApproval = (
   diff?: ApprovalDiff,
 ) => Promise<ApprovalChoice>;
 
-// Edit mode drops shell access — file read/create/edit tools only, no
-// run_terminal — so "Edit" can't run arbitrary commands, only "Agent" can.
-const EDIT_MODE_TOOLS = TOOLS.filter((t) => t.name !== "run_terminal");
+// Edit mode drops shell/exec access — file read/create/edit tools only, no
+// run_terminal or view_diff (both spawn a subprocess) — so "Edit" can't run
+// arbitrary commands, only "Agent" can.
+const EDIT_MODE_TOOLS = TOOLS.filter((t) => t.name !== "run_terminal" && t.name !== "view_diff");
 
 // Approver backed by an inline chat-transcript prompt (Copilot/Claude-chat
 // style) instead of a blocking native modal. "Approve all" flips auto-approve
