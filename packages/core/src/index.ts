@@ -15,6 +15,7 @@ export * from "./providers/modelList";
 export * from "./context/chunking";
 export * from "./context/vectorstore";
 export * from "./context/retrieval";
+export * from "./context/budget";
 export * from "./context/mentions";
 export * from "./context/exclude";
 
