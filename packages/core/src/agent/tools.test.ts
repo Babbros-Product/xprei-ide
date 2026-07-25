@@ -48,6 +48,76 @@ test("edit_file with no 'find' overwrites the whole file", async () => {
   assert.equal(host.files.get("a.ts"), "new");
 });
 
+test("multi_edit applies edits sequentially, each operating on the prior result", async () => {
+  const host = new FakeHost({ "a.ts": "let a = 1;" });
+  const r = await tool("multi_edit").run(
+    {
+      path: "a.ts",
+      edits: [
+        { find: "let", replace: "const" },
+        { find: "const a = 1", replace: "const a = 2" },
+      ],
+    },
+    host,
+  );
+  assert.equal(host.files.get("a.ts"), "const a = 2;");
+  assert.equal(r.wrote, "a.ts");
+  assert.match(r.observation, /Applied 2 edit\(s\)/);
+});
+
+test("multi_edit aborts the whole batch on an ambiguous match, file unchanged", async () => {
+  const host = new FakeHost({ "a.ts": "x x\ny" });
+  const r = await tool("multi_edit").run(
+    {
+      path: "a.ts",
+      edits: [
+        { find: "y", replace: "z" },
+        { find: "x", replace: "w" },
+      ],
+    },
+    host,
+  );
+  assert.match(r.observation, /multiple times/);
+  assert.equal(host.files.get("a.ts"), "x x\ny");
+});
+
+test("multi_edit aborts the whole batch when a later edit's find is not found, file unchanged", async () => {
+  const host = new FakeHost({ "a.ts": "one\ntwo" });
+  const r = await tool("multi_edit").run(
+    {
+      path: "a.ts",
+      edits: [
+        { find: "one", replace: "1" },
+        { find: "three", replace: "3" },
+      ],
+    },
+    host,
+  );
+  assert.match(r.observation, /not found/);
+  assert.equal(host.files.get("a.ts"), "one\ntwo");
+});
+
+test("multi_edit errors on an empty edits array without reading the file", async () => {
+  const host = new FakeHost({ "a.ts": "x" });
+  const r = await tool("multi_edit").run({ path: "a.ts", edits: [] }, host);
+  assert.match(r.observation, /non-empty array/);
+});
+
+test("multi_edit errors when 'edits' is missing entirely", async () => {
+  const host = new FakeHost({ "a.ts": "x" });
+  const r = await tool("multi_edit").run({ path: "a.ts" }, host);
+  assert.match(r.observation, /non-empty array/);
+});
+
+test("multi_edit errors on a malformed edit, identifying the index", async () => {
+  const host = new FakeHost({ "a.ts": "x" });
+  const r = await tool("multi_edit").run(
+    { path: "a.ts", edits: [{ find: "x", replace: "y" }, { find: "x" }] },
+    host,
+  );
+  assert.match(r.observation, /edits\[1\]/);
+});
+
 test("run_terminal surfaces exit code and streams", async () => {
   const host = new FakeHost();
   host.execResult = { stdout: "ok", stderr: "", code: 0 };

@@ -199,6 +199,59 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: "multi_edit",
+    description:
+      "Apply multiple find/replace edits to a single file in one call. Edits are " +
+      "applied in order — each operates on the result of the previous one. Each " +
+      "'find' must match exactly once at the point it's applied. All edits are " +
+      "validated before any are written: if any edit fails, the file is left " +
+      "completely unchanged.",
+    args: '{ "path": string, "edits": Array<{ "find": string, "replace": string }> }',
+    mutating: true,
+    async run(args, host) {
+      const path = str(args, "path");
+      if (!path) return { observation: "Error: 'path' is required." };
+
+      const rawEdits = args["edits"];
+      if (!Array.isArray(rawEdits) || rawEdits.length === 0) {
+        return { observation: "Error: 'edits' must be a non-empty array." };
+      }
+
+      const edits: { find: string; replace: string }[] = [];
+      for (let i = 0; i < rawEdits.length; i++) {
+        const e = rawEdits[i] as Record<string, unknown> | null;
+        const find = e && typeof e["find"] === "string" ? e["find"] : undefined;
+        const replace = e && typeof e["replace"] === "string" ? e["replace"] : undefined;
+        if (find === undefined || replace === undefined) {
+          return { observation: `Error: edits[${i}] must have string 'find' and 'replace'.` };
+        }
+        edits.push({ find, replace });
+      }
+
+      let content: string;
+      try {
+        content = await host.readFile(path);
+      } catch (err) {
+        return { observation: `Error: cannot read ${path}. ${errText(err)}` };
+      }
+
+      for (let i = 0; i < edits.length; i++) {
+        const { find, replace } = edits[i];
+        const first = content.indexOf(find);
+        if (first < 0) {
+          return { observation: `Error: edits[${i}]'s 'find' text not found in ${path} (after applying ${i} prior edit(s)).` };
+        }
+        if (content.indexOf(find, first + find.length) >= 0) {
+          return { observation: `Error: edits[${i}]'s 'find' text matches multiple times in ${path} (after applying ${i} prior edit(s)); make it more specific.` };
+        }
+        content = content.slice(0, first) + replace + content.slice(first + find.length);
+      }
+
+      await host.writeFile(path, content);
+      return { observation: `Applied ${edits.length} edit(s) to ${path}.`, wrote: path };
+    },
+  },
+  {
     name: "run_terminal",
     description:
       "Run a shell command in the workspace root (e.g. 'npm test'). Returns stdout, stderr, exit code.",
