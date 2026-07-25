@@ -47,17 +47,23 @@ export function formatDiff(diff: string): string {
   return `// Current git diff:\n${diff}`;
 }
 
+export function formatTerminal(command: string, output: string): string {
+  return `// $ ${command}\n${output}`;
+}
+
 // Assemble the final context message the chat prepends before the user turn.
 export function buildContextMessage(parts: {
   retrieved?: string;
   files?: string;
   problems?: string;
   diff?: string;
+  terminal?: string;
 }): string {
   const sections: string[] = [];
   if (parts.files) sections.push(parts.files);
   if (parts.problems) sections.push(parts.problems);
   if (parts.diff) sections.push(parts.diff);
+  if (parts.terminal) sections.push(parts.terminal);
   if (parts.retrieved) sections.push("// Relevant code from the workspace:\n" + parts.retrieved);
   if (sections.length === 0) return "";
   return (

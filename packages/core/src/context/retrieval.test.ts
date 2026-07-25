@@ -7,6 +7,7 @@ import {
   formatFiles,
   formatHits,
   formatProblems,
+  formatTerminal,
   ProblemInfo,
 } from "./retrieval";
 import { SearchHit } from "./vectorstore";
@@ -110,5 +111,37 @@ test("buildContextMessage with only diff present produces just the diff section"
   assert.equal(
     out,
     "The user referenced workspace context. Use it to answer.\n\n// Current git diff:\nsome diff",
+  );
+});
+
+test("formatTerminal wraps the command and its output", () => {
+  const out = formatTerminal("npm test", "PASS  src/index.test.ts\n5 tests passed");
+  assert.equal(out, "// $ npm test\nPASS  src/index.test.ts\n5 tests passed");
+});
+
+test("buildContextMessage assembles files, problems, diff, terminal, and retrieved in that order", () => {
+  const out = buildContextMessage({
+    files: "// FILE: a.ts\ncontent",
+    problems: "// a.ts:1 (error) bad",
+    diff: "// Current git diff:\nsome diff",
+    terminal: "// $ npm test\nPASS",
+    retrieved: "// a.ts:1-2 (score 0.90)\ncode",
+  });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n" +
+      "// FILE: a.ts\ncontent\n\n" +
+      "// a.ts:1 (error) bad\n\n" +
+      "// Current git diff:\nsome diff\n\n" +
+      "// $ npm test\nPASS\n\n" +
+      "// Relevant code from the workspace:\n// a.ts:1-2 (score 0.90)\ncode",
+  );
+});
+
+test("buildContextMessage with only terminal present produces just the terminal section", () => {
+  const out = buildContextMessage({ terminal: "// $ npm test\nPASS" });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n// $ npm test\nPASS",
   );
 });

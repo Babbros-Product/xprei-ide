@@ -5,6 +5,10 @@
 //   @open              → inline every currently-open editor tab
 //   @problems          → inline error/warning diagnostics from open files
 //   @diff              → inline the current staged + unstaged git diff
+//   @terminal:<cmd>    → run a shell command (with confirmation) and
+//                        inline its output; must be the LAST thing in
+//                        the message — everything after "@terminal:" to
+//                        the end of the text is the command verbatim
 // The remaining prose (mentions stripped) is what we embed for retrieval.
 
 export interface Mentions {
@@ -12,10 +16,20 @@ export interface Mentions {
   open: boolean;
   problems: boolean;
   diff: boolean;
+  terminalCommand: string | undefined;
   files: string[];
   // Message with mention tokens removed, used as the retrieval query.
   cleaned: string;
 }
+
+// Anchored to end-of-string ($), non-global (only one @terminal: makes
+// sense per message), captures everything after "@terminal:" to the end
+// of the text. Must run BEFORE every other mention regex in
+// parseMentions() below — otherwise those regexes would try to parse
+// pieces of the command text (e.g. a path-looking token inside
+// "npm run build src/index.ts") as separate mentions before @terminal
+// ever claims the trailing span.
+const TERMINAL_RE = /(^|\s)@terminal:(.+)$/i;
 
 const CODEBASE_RE = /(^|\s)@codebase\b/gi;
 const OPEN_RE = /(^|\s)@open\b/gi;
@@ -31,7 +45,13 @@ export function parseMentions(text: string): Mentions {
   let open = false;
   let problems = false;
   let diff = false;
+  let terminalCommand: string | undefined;
   let cleaned = text;
+
+  cleaned = cleaned.replace(TERMINAL_RE, (_m, pre: string, command: string) => {
+    terminalCommand = command;
+    return pre;
+  });
 
   cleaned = cleaned.replace(CODEBASE_RE, (_m, pre) => {
     codebase = true;
@@ -68,11 +88,12 @@ export function parseMentions(text: string): Mentions {
     open,
     problems,
     diff,
+    terminalCommand,
     files: [...new Set(files)],
     cleaned: cleaned.replace(/\s+/g, " ").trim(),
   };
 }
 
 export function hasContextRequest(m: Mentions): boolean {
-  return m.codebase || m.open || m.problems || m.diff || m.files.length > 0;
+  return m.codebase || m.open || m.problems || m.diff || m.terminalCommand !== undefined || m.files.length > 0;
 }

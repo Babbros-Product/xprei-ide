@@ -82,3 +82,38 @@ test("diff flag is false when absent", () => {
   const m = parseMentions("just a normal question");
   assert.equal(m.diff, false);
 });
+
+test("@terminal:<command> captures everything to the end of the message", () => {
+  const m = parseMentions("why did this fail @terminal:npm test");
+  assert.equal(m.terminalCommand, "npm test");
+  assert.equal(m.cleaned, "why did this fail");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@terminal:<command> with a multi-word command including flags", () => {
+  const m = parseMentions("@terminal:git status -sb");
+  assert.equal(m.terminalCommand, "git status -sb");
+});
+
+test("@terminal is undefined when absent", () => {
+  const m = parseMentions("just a normal question");
+  assert.equal(m.terminalCommand, undefined);
+  assert.equal(hasContextRequest(m), false);
+});
+
+test("@terminal:<command> runs before other mention regexes and doesn't let them steal from it", () => {
+  // Without the "runs first, claims to end-of-string" rule, FILE_RE or
+  // BARE_PATH_RE could try to parse "src/index.ts" out of the command
+  // text as a separate @file: mention. It must not.
+  const m = parseMentions("@terminal:npm run build src/index.ts");
+  assert.equal(m.terminalCommand, "npm run build src/index.ts");
+  assert.deepEqual(m.files, []);
+});
+
+test("@terminal combines with other mention types when they precede it", () => {
+  const m = parseMentions("@codebase @diff explain @terminal:npm test");
+  assert.equal(m.codebase, true);
+  assert.equal(m.diff, true);
+  assert.equal(m.terminalCommand, "npm test");
+  assert.equal(m.cleaned, "explain");
+});
