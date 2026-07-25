@@ -6,6 +6,7 @@ import { InlineEditController } from "./edit/inlineEdit";
 import { ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "./providers/registry";
 import { runAddProviderFlow } from "./providers/addProviderFlow";
+import { tryAutoDiscoverOllama } from "./providers/autoDiscover";
 import { ChatViewProvider, QuickActionKind } from "./ui/chat/chatView";
 import { generateCommitMessage } from "./git/commitMessage";
 import { InlineCompletionProvider } from "./completion/inlineCompletionProvider";
@@ -158,6 +159,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   void engine.load();
+
+  // First-run convenience: if no chat model is set yet, quietly look for a
+  // local Ollama daemon and offer one-click setup. Fire-and-forget — it
+  // must never delay activation, and stays silent when nothing is found.
+  void tryAutoDiscoverOllama(registry);
 
   // Chat lives in its own Activity Bar container — open it on startup so
   // it's not hidden behind an icon the user has to discover. (Users can
