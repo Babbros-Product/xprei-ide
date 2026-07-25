@@ -199,6 +199,20 @@ export const TOOLS: Tool[] = [
       return { observation: truncate(parts.join("\n")) };
     },
   },
+  {
+    name: "view_diff",
+    description: "Show the current git diff (working tree + staged changes vs HEAD).",
+    args: "{}",
+    mutating: false,
+    async run(_args, host) {
+      const r = await host.exec("git diff HEAD");
+      if (!r.stdout.trim() && !r.stderr.trim()) return { observation: "No changes." };
+      const parts: string[] = [];
+      if (r.stdout.trim()) parts.push(r.stdout.trim());
+      if (r.stderr.trim()) parts.push(`stderr:\n${r.stderr.trim()}`);
+      return { observation: truncate(parts.join("\n")) };
+    },
+  },
 ];
 
 export function toolByName(name: string): Tool | undefined {

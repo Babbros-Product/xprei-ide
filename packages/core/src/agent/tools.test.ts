@@ -123,3 +123,25 @@ test("glob_search errors on missing pattern", async () => {
   const r = await tool("glob_search").run({}, new FakeHost());
   assert.match(r.observation, /Error/);
 });
+
+test("view_diff runs git diff HEAD and returns its stdout", async () => {
+  const host = new FakeHost();
+  host.execResult = { stdout: "diff --git a/x.ts b/x.ts\n+added line\n", stderr: "", code: 0 };
+  const r = await tool("view_diff").run({}, host);
+  assert.deepEqual(host.execCalls, ["git diff HEAD"]);
+  assert.match(r.observation, /added line/);
+});
+
+test("view_diff reports no changes on empty stdout", async () => {
+  const host = new FakeHost();
+  host.execResult = { stdout: "", stderr: "", code: 0 };
+  const r = await tool("view_diff").run({}, host);
+  assert.match(r.observation, /No changes/);
+});
+
+test("view_diff surfaces stderr on a nonzero exit code", async () => {
+  const host = new FakeHost();
+  host.execResult = { stdout: "", stderr: "fatal: not a git repository", code: 128 };
+  const r = await tool("view_diff").run({}, host);
+  assert.match(r.observation, /not a git repository/);
+});
