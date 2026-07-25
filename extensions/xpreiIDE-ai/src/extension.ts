@@ -86,8 +86,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   void engine.load();
 
-  // Chat lives in the Secondary Side Bar (right side) — open it on startup so
-  // it's not hidden behind an icon the user has to discover.
+  // Chat lives in its own Activity Bar container — open it on startup so
+  // it's not hidden behind an icon the user has to discover. (Users can
+  // drag the view to the Secondary Side Bar themselves if they prefer —
+  // VS Code has no stable extension-contribution API for that placement.)
   void vscode.commands.executeCommand("workbench.view.extension.xpreiIDE");
 }
 

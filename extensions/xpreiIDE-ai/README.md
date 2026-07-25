@@ -2,8 +2,8 @@
 
 Bring-your-own-model AI assistant for VS Code. Chat with a local **Ollama**
 daemon or any **OpenAI-compatible** endpoint (OpenAI, vLLM, LM Studio,
-OpenRouter, Together, …). P1 of the xpreiIDE IDE — pure extension, runs on
-stock VS Code.
+OpenRouter, Together, …). A pure extension — no fork, no branded app, runs
+on stock VS Code.
 
 ## Run it (dev)
 
@@ -79,7 +79,5 @@ its thoughts, tool calls, and observations into the transcript.
   (**Approve** / **Approve all**). Set `xpreiIDE.agent.autoApprove` to skip.
 - **Revert.** Every run is checkpointed; **xpreiIDE: Revert Last Agent Run** undoes
   all of its file changes (restores edits, deletes new files).
-- **Bounds.** `xpreiIDE.agent.maxSteps` (default 20) caps a run.
-
-Next phase (see the architecture plan): P0 — package into a downloadable branded
-IDE (Code-OSS distro build).
+- **Bounds.** `xpreiIDE.agent.maxSteps` (default 0 = unlimited; stops only when
+  the model finishes or you hit Stop) caps a run if you set it.

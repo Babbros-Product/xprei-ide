@@ -5,6 +5,7 @@
   "version": "0.0.1",
   "publisher": "xpreiIDE",
   "icon": "media/icon.png",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -13,13 +14,23 @@
     "Chat",
     "Other"
   ],
+  "keywords": [
+    "ai",
+    "chat",
+    "agent",
+    "ollama",
+    "llm",
+    "copilot",
+    "openai",
+    "bring your own model"
+  ],
   "main": "./dist/extension.js",
   "activationEvents": [
     "onStartupFinished"
   ],
   "contributes": {
     "viewsContainers": {
-      "auxiliarybar": [
+      "activitybar": [
         {
           "id": "xpreiIDE",
           "title": "xpreiIDE",

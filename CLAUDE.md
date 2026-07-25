@@ -1,32 +1,56 @@
 # xpreiIDE — project context
 
-A Cursor-like AI IDE where anyone plugs in **their own models or local
+A Cursor-like AI assistant where anyone plugs in **their own models or local
 open-source models (via Ollama)** and an agent completes their project.
 Repo dir: `D:\Claude\BABBROSIDE` (git, branch `master`). Was named "BABBROSIDE".
 
 ## Locked decisions
 
-- **Foundation:** branded distro build on **Code-OSS** (MIT), VSCodium-style — NOT
-  a heavy fork of core files. Ship as a downloadable branded app, Open VSX gallery.
-- **Core principle:** keep the fork diff tiny; put all logic in the bundled
-  extension. Develop the extension against **stock VS Code** (fast F5), package into
-  the distro only at P0.
+- **Foundation:** a **pure VS Code extension**, published to the VS Code
+  Marketplace and Open VSX — NOT a branded distro/fork. (Reversed from an
+  earlier Code-OSS-distro plan; see "Superseded" below for why.)
+- **Core principle:** all logic lives in the extension, developed and run
+  against **stock VS Code** — no core patches, no custom build pipeline.
 - **AI scope:** chat + @context/RAG + Cmd-K inline edit + **agentic multi-file**.
 - **Models:** Ollama (NDJSON) + any OpenAI-compatible endpoint (SSE). Two adapters
   cover ~95% of "bring your own model".
 - **Agent tool-calling:** a **universal prompt-based JSON tool protocol**, not
   native function-calling (unreliable on OSS models). Agent quality is model-gated.
 
+### Superseded: branded Code-OSS distro (P0)
+
+Originally planned as a VSCodium-style branded distro build (own installer,
+own icon, Code-OSS core patched to dock chat in the Secondary Side Bar).
+Dropped 2026-07-25 in favor of shipping as a normal extension:
+- 99% of the work already lived in the extension and already ran on stock
+  VS Code — the distro added packaging risk without adding user value.
+- The Secondary Side Bar placement required patching VS Code core
+  (`viewsExtensionPoint.ts`) because `auxiliarybar` was never a stable
+  `viewsContainers` contribution point for extensions (confirmed still true
+  as of this date — see microsoft/vscode issues #151681, #198087). Chat now
+  lives in a normal Activity Bar container instead; users can drag it to the
+  Secondary Side Bar themselves if they want that layout.
+- The distro build had a standing, unfixable-from-here blocker: node-gyp
+  native-module compilation failed under this machine's sandboxed shell
+  tooling (Windows Job Object nesting restriction), worked around with
+  `--ignore-scripts` but never cleanly resolved, plus 30-45 min full
+  rebuilds and no installer signing/auto-update story.
+- The `build/` directory (Code-OSS checkout, build scripts, staged output)
+  was removed entirely. If a branded distro is ever revisited, git history
+  before commit that removed it has the full working toolchain and scripts.
+
 ## Layout
 
 ```
-extensions/xpreiIDE-ai/     # the extension — 99% of the work
+extensions/xpreiIDE-ai/     # the extension — the whole product
   src/providers/            # provider.ts, ollama.ts, openai-compat.ts, registry.ts
-  src/context/              # chunking, vectorstore, mentions, retrieval, contextEngine
-  src/edit/                 # Cmd-K inline edit (prompt.ts, inlineEdit.ts)
-  src/agent/                # protocol, tools, host, checkpoint, orchestrator, runner
-  src/ui/chat/ + media/     # chat webview
-build/                      # P0 branded-distro build tooling (scaffold only)
+  src/context/               # chunking, vectorstore, mentions, retrieval, contextEngine, projectRules
+  src/edit/                  # Cmd-K inline edit (prompt.ts, inlineEdit.ts)
+  src/agent/                 # protocol, tools, host, checkpoint, orchestrator, runner, editDecorations, pathResolve
+  src/completion/            # ghost-text inline completions
+  src/git/                   # SCM commit-message generation
+  src/ui/chat/ + media/      # chat webview
+docs/superpowers/specs/     # design specs (brainstorming skill output)
 ```
 
 ## Phase status
@@ -35,11 +59,7 @@ build/                      # P0 branded-distro build tooling (scaffold only)
 - **P2 context/RAG** (@codebase/@file, dependency-free cosine store) — done
 - **P3 Cmd-K inline edit** (red/green diff, Enter/Esc) — done
 - **P4 agent loop** (tools, protocol, approvals, checkpoints) — done, `48b31ba`
-- **P0 branded distro build** — **done**. `build/VSCode-win32-x64/xpreiIDE.exe`
-  built and staged with `xpreiIDE-ai` as a built-in. See `build/README.md` and
-  the build status below for how the native-module blocker was worked around.
-- **P5 polish** — in progress. Done: chat lives in the Secondary Side Bar
-  (right side, via `build/scripts/patch-core.mjs`'s `auxiliarybar` core patch)
+- **P5 polish** — in progress. Done: chat lives in an Activity Bar container
   and opens automatically on startup; quick actions (Explain/Fix/Tests/Comments/
   Refactor via right-click or `/slash` commands, seeded into chat); `.xpreiIDErules`
   project-instructions file; chat code-block actions (Copy/Insert/Apply);
@@ -50,56 +70,34 @@ build/                      # P0 branded-distro build tooling (scaffold only)
   inline completions (ties up any configured model via `chatStream`, not a
   dedicated FIM endpoint — quality is model-gated). Still open: per-role models,
   weak-model handling, telemetry, diff-preview-before-apply for multi-file agent
-  runs (current design proposes edits one at a time, ReAct-style — a true
-  upfront batch preview would need an orchestrator redesign).
+  runs (design spec written and approved:
+  `docs/superpowers/specs/2026-07-24-diff-preview-before-apply-design.md` —
+  implementation not started).
+- **Marketplace publish** — not started. Extension is publish-ready
+  (`package.json` has publisher/license/icon/categories/keywords,
+  `.vscodeignore` and `LICENSE` present, `vscode:prepublish` runs the
+  minified build). Publishing itself (VS Code Marketplace `vsce publish` +
+  Open VSX `ovsx publish`) needs the user's own publisher account/PAT — not
+  done by the agent.
 
-## P0 build status (this machine) — DONE
+## Working in the extension
 
-Toolchain installed and confirmed working (persists across sessions):
-- Node via **nvm4w** (`C:\nvm4w`, `NVM_HOME=%LOCALAPPDATA%\nvm`) — active version
-  20.18.3. Switch with `& "$env:LOCALAPPDATA\nvm\nvm.exe" use <version>` (run
-  from inside that directory — see gotcha below).
-- yarn 1.22.22 (global via npm)
-- VS Build Tools 2022 + C++ workload (Desktop development with C++)
-- Inno Setup 6.7.3 (installer target)
-
-**Native-module blocker (worked around):** `yarn install` in `build/vscode`
-fails compiling native modules (`@vscode/policy-watcher`, `@vscode/spdlog`,
-`@vscode/deviceid`, etc.) via node-gyp with `AssignProcessToJobObject: (87) The
-parameter is incorrect` — an OS-level Windows Job Object nesting restriction
-inherited from this environment's process ancestry, not fixable from inside
-any shell tool (confirmed across Bash sandboxed/unsandboxed, PowerShell tool,
-two Node 20.x versions). **Fix used:** run every `yarn install` with
-`--ignore-scripts` (skips node-gyp entirely). These native modules are
-runtime-only bindings for enterprise policy/Windows-cert-store/structured
-logging/telemetry — not needed to compile or run the editor itself.
-
-**Full working build sequence** (already executed once; rerun after a clean
-checkout or dependency bump):
-```powershell
-$env:Path = "C:\nvm4w\nodejs;C:\Users\mbsaj\AppData\Roaming\npm;" + $env:Path
-# 1. Root deps (--ignore-scripts avoids the node-gyp blocker above)
-yarn --cwd D:\Claude\BABBROSIDE\build\vscode install --ignore-scripts
-# 2. VS Code has a SEPARATE build/package.json with its own deps (easy to miss)
-yarn --cwd D:\Claude\BABBROSIDE\build\vscode\build install --ignore-scripts
-# 3. Every built-in extension has its OWN package.json too (94 total, including
-#    nested css/html/json/markdown-language-features\server subfolders, plus
-#    the extensions/ folder's own manifest) — install each with --ignore-scripts
-# 4. Then the real build:
-yarn --cwd D:\Claude\BABBROSIDE\build\vscode gulp vscode-win32-x64
 ```
-Takes ~30-45 min (TypeScript compile of the whole codebase alone is ~25-30
-min and reruns from scratch every time — `clean-out-build` wipes prior output
-unconditionally). Output: `build/VSCode-win32-x64/xpreiIDE.exe` (~379MB).
-Stage the extension in with:
-```powershell
-node build\scripts\stage-extension.mjs build\VSCode-win32-x64
+cd extensions/xpreiIDE-ai
+npm install
+npm run typecheck        # tsc --noEmit
+npm test                 # node --import tsx --test  (65 tests, all pure/headless)
+npm run compile          # esbuild → dist/extension.js
+# then F5 in VS Code for an Extension Development Host
 ```
-Installer (needs Inno Setup):
-```powershell
-cd build\vscode
-yarn gulp vscode-win32-x64-inno-setup
-```
+
+Tests are dependency-free: pure modules + fakes (`_fakehost.ts`, provider mocks).
+No test needs a live model. When adding a test file, add it to the `test` script
+list in `package.json`.
+
+Package a local `.vsix` to test install: `npx vsce package` from
+`extensions/xpreiIDE-ai` (needs `vsce` — `npm install -g @vscode/vsce` or
+`npx` pulls it on demand).
 
 ## Environment gotchas (this machine)
 
@@ -111,24 +109,6 @@ yarn gulp vscode-win32-x64-inno-setup
 - `nvm.exe` must be run from inside `%LOCALAPPDATA%\nvm` (relative-path bug if
   invoked via a bare full path from elsewhere) with `$env:NVM_HOME` /
   `$env:NVM_SYMLINK` set.
-- Native Windows job-object restriction above applies to **any** node-gyp
-  compile step invoked from the agent's shell tools, not just this build —
-  keep in mind for any future task needing native npm module compilation.
-
-## Working in the extension
-
-```
-cd extensions/xpreiIDE-ai
-npm install
-npm run typecheck        # tsc --noEmit
-npm test                 # node --import tsx --test  (49 tests, all pure/headless)
-npm run compile          # esbuild → dist/extension.js
-# then F5 in VS Code for an Extension Development Host
-```
-
-Tests are dependency-free: pure modules + fakes (`_fakehost.ts`, provider mocks).
-No test needs a live model. When adding a test file, add it to the `test` script
-list in `package.json`.
 
 ## Conventions
 
@@ -148,7 +128,3 @@ list in `package.json`.
 - Unbounded chat history (no trimming yet).
 - Inline edit applies once on completion, not token-by-token into the buffer.
 - Agent feeds observations as `user` turns (not a `tool` role) for OSS compatibility.
-- P0: installer/signing/auto-update not wired. Branded icons (from
-  `xprei.online`'s favicon) are in `build/resources/icons/`, wired into
-  `patch-product.mjs`, and already applied to the staged `xpreiIDE.exe` via
-  `rcedit` — see `build/README.md`.
