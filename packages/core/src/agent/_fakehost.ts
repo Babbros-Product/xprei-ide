@@ -1,6 +1,7 @@
 // In-memory AgentHost for tests. Backs files with a Map; records exec calls.
 
 import { AgentHost, ExecResult, GrepHit } from "./host";
+import { matchGlob } from "./glob";
 
 export class FakeHost implements AgentHost {
   readonly cwd = "/work";
@@ -52,6 +53,15 @@ export class FakeHost implements AgentHost {
       });
     }
     return hits;
+  }
+
+  async glob(pattern: string, path?: string): Promise<string[]> {
+    const out: string[] = [];
+    for (const file of this.files.keys()) {
+      if (path && !file.startsWith(path)) continue;
+      if (matchGlob(pattern, file)) out.push(file);
+    }
+    return out;
   }
 
   async exec(command: string): Promise<ExecResult> {

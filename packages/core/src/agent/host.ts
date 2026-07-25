@@ -23,5 +23,6 @@ export interface AgentHost {
   exists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
   grep(query: string, path?: string): Promise<GrepHit[]>;
+  glob(pattern: string, path?: string): Promise<string[]>;
   exec(command: string): Promise<ExecResult>;
 }
