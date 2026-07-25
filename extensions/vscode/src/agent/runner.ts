@@ -61,6 +61,10 @@ function summarize(tool: string, args: Record<string, unknown>): string {
   if (tool === "edit_file") {
     return args.find === undefined ? `Overwrite ${path}` : `Edit ${path}`;
   }
+  if (tool === "multi_edit") {
+    const edits = Array.isArray(args.edits) ? args.edits : [];
+    return `Edit ${path} (${edits.length} edits)`;
+  }
   return path;
 }
 
@@ -80,6 +84,16 @@ function buildDiffPreview(tool: string, args: Record<string, unknown>): Approval
     const find = typeof args.find === "string" ? args.find : undefined;
     const replace = typeof args.replace === "string" ? args.replace : "";
     return find === undefined ? { after: clip(replace) } : { before: clip(find), after: clip(replace) };
+  }
+  if (tool === "multi_edit") {
+    const edits = Array.isArray(args.edits) ? (args.edits as Record<string, unknown>[]) : [];
+    const before = edits
+      .map((e, i) => `[${i + 1}] ${typeof e.find === "string" ? e.find : ""}`)
+      .join("\n");
+    const after = edits
+      .map((e, i) => `[${i + 1}] ${typeof e.replace === "string" ? e.replace : ""}`)
+      .join("\n");
+    return { before: clip(before), after: clip(after) };
   }
   return undefined;
 }
