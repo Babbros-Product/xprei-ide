@@ -11,6 +11,7 @@ import { exec as execCb } from "node:child_process";
 import { AgentHost, ExecResult, GrepHit } from "../agent/host";
 import { resolveWorkspacePath } from "../agent/pathResolve";
 import { isExcludedPath } from "../context/exclude";
+import { collectGlobMatches, DirEntry } from "../agent/glob";
 
 const execAsync = promisify(execCb);
 
@@ -18,6 +19,7 @@ const MAX_GREP_HITS = 50;
 const MAX_GREP_FILE_BYTES = 200_000;
 const EXEC_TIMEOUT_MS = 120_000;
 const EXEC_MAX_BUFFER = 4 * 1024 * 1024;
+const MAX_GLOB_RESULTS = 200;
 
 export class NodeAgentHost implements AgentHost {
   constructor(private readonly root: string) {}
@@ -111,6 +113,24 @@ export class NodeAgentHost implements AgentHost {
         }
       }
     }
+  }
+
+  async glob(pattern: string, p?: string): Promise<string[]> {
+    const start = this.resolve(p || ".");
+    return collectGlobMatches(
+      pattern,
+      start,
+      async (dir) => {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        return entries.map(
+          (e): DirEntry => ({ name: e.name, isDirectory: e.isDirectory() }),
+        );
+      },
+      (abs) => this.toRel(abs),
+      (a, b) => path.join(a, b),
+      (rel) => isExcludedPath(rel),
+      MAX_GLOB_RESULTS,
+    );
   }
 
   async exec(command: string): Promise<ExecResult> {

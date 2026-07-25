@@ -69,3 +69,31 @@ test("exec surfaces a non-zero exit code instead of throwing", async () => {
   const r = await host.exec(process.platform === "win32" ? "exit /b 3" : "exit 3");
   assert.notEqual(r.code, 0);
 });
+
+test("glob finds files by pattern and skips excluded dirs", async () => {
+  const root = await tmpRoot();
+  const host = new NodeAgentHost(root);
+  await host.writeFile("src/a.ts", "x");
+  await host.writeFile("src/sub/b.ts", "x");
+  await host.writeFile("src/c.js", "x");
+  await host.writeFile("node_modules/pkg/index.ts", "x");
+  const out = (await host.glob("**/*.ts")).sort();
+  assert.deepEqual(out, ["src/a.ts", "src/sub/b.ts"]);
+});
+
+test("glob scopes to an optional path prefix", async () => {
+  const root = await tmpRoot();
+  const host = new NodeAgentHost(root);
+  await host.writeFile("src/a.ts", "x");
+  await host.writeFile("test/b.ts", "x");
+  const out = await host.glob("**/*.ts", "src");
+  assert.deepEqual(out, ["src/a.ts"]);
+});
+
+test("glob with no matches returns an empty array", async () => {
+  const root = await tmpRoot();
+  const host = new NodeAgentHost(root);
+  await host.writeFile("a.ts", "x");
+  const out = await host.glob("*.md");
+  assert.deepEqual(out, []);
+});
