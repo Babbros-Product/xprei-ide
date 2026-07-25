@@ -174,7 +174,9 @@ configuration (runtime workbench).
 - **Agentic multi-file coder** — a universal JSON tool protocol that works even on
   smaller open-source models (no reliance on native function-calling), with
   approval gates and one-click revert.
-- **Codebase-aware context** — `@codebase` semantic retrieval and `@file:` mentions.
+- **Codebase-aware context** — `@codebase` semantic retrieval, `@file:`
+  mentions, `@open` (every open tab), and `@problems` (current
+  error/warning diagnostics).
 - **Inline edit** — select code, describe a change, review a red/green diff.
 - **Ghost-text completions**, **commit-message generation**, and right-click quick
   actions (Explain / Fix / Tests / Comments / Refactor).
