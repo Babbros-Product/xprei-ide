@@ -56,7 +56,7 @@ packages/core/             # @xprei/core — platform-neutral, no vscode import
   src/server/              # session.ts (JSON-RPC session) + stdio.ts (entrypoint) — the sidecar
   src/index.ts             # barrel — the public API the extension imports (NOT server/stdio.ts,
                             # which has a top-level auto-start side effect; import it directly)
-  # ALL unit tests live here now (84, run: npm test -w @xprei/core)
+  # ALL unit tests live here now (97, run: npm test -w @xprei/core)
 extensions/vscode/    # the VS Code platform layer — imports @xprei/core
   src/providers/           # registry.ts, addProviderFlow.ts (config/secrets/QuickPick)
   src/context/             # contextEngine.ts, projectRules.ts (vscode.fs/index persistence)
@@ -94,9 +94,12 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
   agent-written files get a brief gutter flash if open; inline chat (Ctrl+I);
   commit-message generation from the staged diff (SCM title button); ghost-text
   inline completions (ties up any configured model via `chatStream`, not a
-  dedicated FIM endpoint — quality is model-gated). Still open: per-role models,
-  weak-model handling, telemetry, diff-preview-before-apply for multi-file agent
-  runs (design spec written and approved:
+  dedicated FIM endpoint — quality is model-gated); weak-model protocol retry
+  (`xpreiIDE.agent.protocolRetries`, default 2 — corrective reprompt + visible
+  retry indicator instead of silently ending the run on unparseable output;
+  design: `docs/superpowers/specs/2026-07-25-weak-model-protocol-retry-design.md`).
+  Still open: per-role models, telemetry, diff-preview-before-apply for
+  multi-file agent runs (design spec written and approved:
   `docs/superpowers/specs/2026-07-24-diff-preview-before-apply-design.md` —
   implementation not started).
 - **Marketplace publish** — not started. Extension is publish-ready
@@ -110,7 +113,7 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 
 ```
 npm install                          # from repo ROOT — links @xprei/core into the extension
-npm test -w @xprei/core              # 84 tests, all pure/headless (node --import tsx --test)
+npm test -w @xprei/core              # 97 tests, all pure/headless (node --import tsx --test)
 npm run typecheck -w @xprei/core     # core tsc --noEmit
 npm run typecheck -w xpreiIDE-ai     # extension tsc --noEmit (resolves @xprei/core via workspace)
 npm run compile -w xpreiIDE-ai       # esbuild → dist/extension.js (inlines @xprei/core from source)
