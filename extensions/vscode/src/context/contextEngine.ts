@@ -16,6 +16,7 @@ import {
   formatFiles,
   formatHits,
   formatProblems,
+  formatTerminal,
   MIN_SCORE,
   ProblemInfo,
   SegmentTier,
@@ -29,6 +30,13 @@ const EMBED_BATCH = 64;
 const MAX_FILE_BYTES = 200 * 1024;
 const MAX_FILE_CHARS = 8000;
 const RETRIEVE_K = 6;
+const MAX_TERMINAL_CHARS = 8000;
+const TERMINAL_EXEC_TIMEOUT_MS = 120_000;
+// Separate, shorter bound just for "does this terminal even support
+// shell integration" — if it hasn't attached in this long, it's not
+// going to (some shells/environments never enable it), so there's no
+// reason to burn the full 120s exec budget waiting for it.
+const SHELL_INTEGRATION_TIMEOUT_MS = 5_000;
 
 export class ContextEngine {
   private store = new VectorStore();
@@ -147,10 +155,11 @@ export class ContextEngine {
   // concatenating everything the mentions resolved to. Tier priority
   // (highest to lowest): @file: ("break", explicit request) > @problems
   // ("skip", compact and actionable) > @diff ("break", one segment) >
-  // @open ("break", bulkier, ordered like files) > @codebase hits
-  // ("skip", a relevance guess). Every tier is built unconditionally
-  // (even when empty) — budgetContext's return value is positionally
-  // aligned with the input tier array.
+  // @terminal ("break", one segment, confirmation-gated) > @open
+  // ("break", bulkier, ordered like files) > @codebase hits ("skip", a
+  // relevance guess). Every tier is built unconditionally (even when
+  // empty) — budgetContext's return value is positionally aligned with
+  // the input tier array.
   async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
@@ -171,6 +180,9 @@ export class ContextEngine {
       : [];
     const problems = mentions.problems ? this.readProblems() : [];
     const diff = mentions.diff ? await this.readDiff() : "";
+    const terminalOutput = mentions.terminalCommand
+      ? await this.runTerminalCommand(mentions.terminalCommand)
+      : "";
 
     const fileTier: SegmentTier = {
       segments: files.map((f) => ({ text: f.content, data: f })),
@@ -184,6 +196,12 @@ export class ContextEngine {
       segments: diff ? [{ text: formatDiff(diff), data: null }] : [],
       strategy: "break",
     };
+    const terminalTier: SegmentTier = {
+      segments: terminalOutput
+        ? [{ text: formatTerminal(mentions.terminalCommand!, terminalOutput), data: null }]
+        : [],
+      strategy: "break",
+    };
     const openTier: SegmentTier = {
       segments: openFiles.map((f) => ({ text: f.content, data: f })),
       strategy: "break",
@@ -194,10 +212,8 @@ export class ContextEngine {
       strategy: "skip",
     };
 
-    const [keptFileSegs, keptProblemSegs, keptDiffSegs, keptOpenSegs, keptHitSegs] = budgetContext(
-      [fileTier, problemTier, diffTier, openTier, hitTier],
-      contextWindow,
-    );
+    const [keptFileSegs, keptProblemSegs, keptDiffSegs, keptTerminalSegs, keptOpenSegs, keptHitSegs] =
+      budgetContext([fileTier, problemTier, diffTier, terminalTier, openTier, hitTier], contextWindow);
 
     const budgetedFiles: FileContext[] = keptFileSegs.map((seg) => ({
       ...(seg.data as FileContext),
@@ -209,6 +225,9 @@ export class ContextEngine {
     // "break" may have truncated this — always reconstruct from seg.text,
     // not from the original (untruncated) diff string.
     const budgetedDiff: string | undefined = keptDiffSegs[0]?.text;
+    // "break" may have truncated this — always reconstruct from seg.text,
+    // not from the original (unbudgeted) command output.
+    const budgetedTerminal: string | undefined = keptTerminalSegs[0]?.text;
     const budgetedOpenFiles: FileContext[] = keptOpenSegs.map((seg) => ({
       ...(seg.data as FileContext),
       content: seg.text,
@@ -223,6 +242,7 @@ export class ContextEngine {
       files: allFiles.length ? formatFiles(allFiles, Number.POSITIVE_INFINITY) : undefined,
       problems: budgetedProblems.length ? formatProblems(budgetedProblems) : undefined,
       diff: budgetedDiff,
+      terminal: budgetedTerminal,
       retrieved: budgetedHits.length ? formatHits(budgetedHits, Number.NEGATIVE_INFINITY) : undefined,
     });
   }
@@ -335,6 +355,102 @@ export class ContextEngine {
         .join("\n\n");
     } catch {
       return ""; // no repo / unborn HEAD / git failure — @diff contributes nothing
+    }
+  }
+
+  // Waits for shell integration to attach to a freshly created terminal
+  // (it isn't available immediately — the shell needs to load its
+  // integration script first). Resolves to undefined if it doesn't
+  // attach within timeoutMs, which covers shells/environments that never
+  // enable shell integration at all. Always cleans up its listener,
+  // whether it resolves via the event or via the timeout.
+  private waitForShellIntegration(
+    terminal: vscode.Terminal,
+    timeoutMs: number,
+  ): Promise<vscode.TerminalShellIntegration | undefined> {
+    if (terminal.shellIntegration) return Promise.resolve(terminal.shellIntegration);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        disposable.dispose();
+        resolve(undefined);
+      }, timeoutMs);
+      const disposable = vscode.window.onDidChangeTerminalShellIntegration((e) => {
+        if (e.terminal === terminal) {
+          clearTimeout(timer);
+          disposable.dispose();
+          resolve(e.shellIntegration);
+        }
+      });
+    });
+  }
+
+  // Executes command in terminal and reads its output, bounded by an
+  // absolute wall-clock deadline. If the deadline passes mid-command
+  // (the command is still producing output, or producing none at all),
+  // returns whatever was captured so far with a truncation marker rather
+  // than hanging indefinitely or discarding partial progress. Each
+  // iteration of the read loop races the next chunk against the
+  // remaining time budget, since a `for await` loop would otherwise
+  // block indefinitely waiting for a chunk that may never come (e.g. a
+  // command that produces no output for a long time before exiting).
+  private async executeAndRead(
+    terminal: vscode.Terminal,
+    command: string,
+    deadlineMs: number,
+  ): Promise<string> {
+    const integration = await this.waitForShellIntegration(terminal, SHELL_INTEGRATION_TIMEOUT_MS);
+    if (!integration) return "";
+
+    const execution = integration.executeCommand(command);
+    const iterator = execution.read()[Symbol.asyncIterator]();
+    let output = "";
+    let timedOut = false;
+
+    while (true) {
+      const remaining = deadlineMs - Date.now();
+      if (remaining <= 0) {
+        timedOut = true;
+        break;
+      }
+
+      const next = await Promise.race([
+        iterator.next().then((result) => ({ timedOut: false as const, result })),
+        new Promise<{ timedOut: true }>((resolve) => setTimeout(() => resolve({ timedOut: true }), remaining)),
+      ]);
+
+      if (next.timedOut) {
+        timedOut = true;
+        break;
+      }
+      if (next.result.done) break; // command finished normally
+      output += next.result.value;
+      if (output.length > MAX_TERMINAL_CHARS) {
+        return output.slice(0, MAX_TERMINAL_CHARS) + TRUNCATION_MARKER;
+      }
+    }
+
+    return timedOut && output ? output + TRUNCATION_MARKER : output;
+  }
+
+  // Runs a shell command in a visible terminal, after user confirmation
+  // (the one mutating mention — every other mention is read-only). "" on
+  // decline, on any failure, or if shell integration never attaches; the
+  // created terminal is left open (not disposed) so the user can see/
+  // interact with what actually ran.
+  private async runTerminalCommand(command: string): Promise<string> {
+    const confirmed = await vscode.window.showWarningMessage(
+      `Run '${command}' in your terminal?`,
+      "Run",
+      "Cancel",
+    );
+    if (confirmed !== "Run") return "";
+
+    try {
+      const terminal = vscode.window.createTerminal({ name: "xpreiIDE" });
+      terminal.show();
+      return await this.executeAndRead(terminal, command, Date.now() + TERMINAL_EXEC_TIMEOUT_MS);
+    } catch {
+      return "";
     }
   }
 
