@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: xpreiIDE
+Bundle-SymbolicName: online.xprei.ide.eclipse;singleton:=true
+Bundle-Version: 0.0.1.qualifier
+Bundle-Vendor: Babbros
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-ActivationPolicy: lazy
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.swt,
+ org.eclipse.equinox.security,
+ org.eclipse.equinox.preferences

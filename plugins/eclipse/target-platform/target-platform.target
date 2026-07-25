@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?pde version="3.8"?>
+<target name="xpreiIDE Eclipse target platform" sequenceNumber="1">
+  <locations>
+    <location includeAllPlatforms="false" includeConfigurePhase="true"
+              includeMode="planner" includeSource="true" type="InstallableUnit">
+      <!-- "latest" tracks the current Eclipse Platform release train — no
+           dated version to go stale. Pin to a dated release
+           (e.g. .../releases/2024-12) once this build is actually verified,
+           for reproducibility. -->
+      <repository location="https://download.eclipse.org/releases/latest"/>
+      <unit id="org.eclipse.platform.feature.group" version="0.0.0"/>
+      <unit id="org.eclipse.equinox.executable.feature.group" version="0.0.0"/>
+    </location>
+  </locations>
+</target>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+  <extension point="org.eclipse.ui.views">
+    <category id="online.xprei.ide.eclipse.category" name="xpreiIDE"/>
+    <view id="online.xprei.ide.eclipse.chatView"
+          name="xpreiIDE Chat"
+          class="online.xprei.ide.eclipse.XpreiChatView"
+          category="online.xprei.ide.eclipse.category"
+          icon="webview/icon.png"/>
+  </extension>
+</plugin>

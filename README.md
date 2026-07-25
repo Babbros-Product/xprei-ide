@@ -116,19 +116,23 @@ cd plugins/intellij
 
 ## Eclipse
 
-> 🚧 *In development.*
+> 🚧 *In development — scaffolded, not yet compiled.* Same status as the
+> JetBrains plugin: the code is written but has not been built against a real
+> Maven/Tycho toolchain yet. See
+> [`plugins/eclipse/README.md`](plugins/eclipse/README.md) for the full
+> status and what to check first.
 
-**Install (planned — update site):**
-1. **Help → Install New Software… → Add…**
-2. Location: `https://xprei.online/eclipse/update-site`
-3. Select **xpreiIDE**, finish the wizard, restart Eclipse.
-
-**Install from a dropins zip (current):**
+**Build from source (current):**
 ```bash
+# one-time: build the shared engine the plugin ships (needs Node.js)
+npm install
+npm run build:sidecar -w @xprei/core
+
 cd plugins/eclipse
-mvn clean package                # Tycho build → target/*.zip
+mvn clean package                # Tycho build → target/*.zip (needs JDK 17+, Maven 3.9+)
 ```
-Unzip into your Eclipse `dropins/` folder and restart Eclipse.
+Unzip the built module's `target/*.zip` into your Eclipse `dropins/` folder and
+restart Eclipse.
 
 **Run:**
 1. Ensure **Node.js ≥ 18** is on your `PATH`.
@@ -137,8 +141,9 @@ Unzip into your Eclipse `dropins/` folder and restart Eclipse.
 4. Pick a model and start chatting.
 
 **Dev workbench:**
-Import `plugins/eclipse` as an Eclipse plugin project and launch an
-**Eclipse Application** run configuration (runtime workbench).
+Import `plugins/eclipse` as an Eclipse plugin project (or open it via
+`mvn eclipse:eclipse` / m2e) and launch an **Eclipse Application** run
+configuration (runtime workbench).
 
 ---
 

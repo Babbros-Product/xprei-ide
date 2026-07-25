@@ -16,3 +16,10 @@ plugins/intellij/.kotlin/
 plugins/intellij/gradlew
 plugins/intellij/gradlew.bat
 plugins/intellij/gradle/
+
+# Maven/Tycho (plugins/eclipse)
+plugins/eclipse/**/target/
+plugins/eclipse/online.xprei.ide.eclipse/bin/
+# generated copies of webview/ + sidecar.cjs (see the child pom.xml's copy-resources executions)
+plugins/eclipse/online.xprei.ide.eclipse/webview/
+plugins/eclipse/online.xprei.ide.eclipse/sidecar.cjs

@@ -73,7 +73,9 @@ webview/                    # shared chat UI (chat.js/css, icons) — host-agnos
 plugins/intellij/          # JetBrains plugin (Kotlin/Gradle) — scaffolded, NOT compiled/run yet
                             # (written with no local JDK/Gradle to verify against — see
                             # plugins/intellij/README.md before touching this code)
-plugins/eclipse/           # Eclipse plugin — planned (Phase 3)
+plugins/eclipse/           # Eclipse plugin (Java/Tycho) — scaffolded, NOT compiled/run yet
+                            # (written with no local Maven to verify against — see
+                            # plugins/eclipse/README.md before touching this code)
 docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 ```
 

@@ -59,7 +59,7 @@ editor, (4) store secrets in the IDE's secure store, (5) persist config.
 
 ## Target repo layout (monorepo)
 
-Current state (Phases 0-1 done and verified; Phase 2 scaffolded, unverified):
+Current state (Phases 0-1 done and verified; Phases 2-3 scaffolded, unverified):
 
 ```
 xprei-ide/                      # repo root (was BABBROSIDE)
@@ -83,7 +83,9 @@ xprei-ide/                      # repo root (was BABBROSIDE)
     intellij/                   # Kotlin/Gradle — scaffolded, NOT yet compiled
                                  # (no local JDK/Gradle to verify against — see
                                  # plugins/intellij/README.md)
-    eclipse/                    # Java, PDE/OSGi plugin — not started (Phase 3)
+    eclipse/                    # Java/Tycho — scaffolded, NOT yet compiled
+                                 # (no local Maven to verify against — see
+                                 # plugins/eclipse/README.md)
   docs/
 ```
 
@@ -195,12 +197,43 @@ assumptions made without a compiler, and what to check first.
   `applyEdit` (no-ops), a revert-last-run command (the sidecar RPC exists and
   is tested; no menu entry yet). Full list in `plugins/intellij/README.md`.
 
-### Phase 3 — Eclipse plugin (Java, PDE/OSGi)
-- ViewPart hosting an SWT `Browser` loading `webview/`; `BrowserFunction` bridge.
-- Same sidecar; native glue: workspace root from `IWorkspaceRoot`; secrets via
-  **Equinox Secure Storage**; config via preferences; apply-edit via `IDocument`;
-  command/handler + menu contributions.
-- MVP feature set only.
+### Phase 3 — Eclipse plugin (Java, Tycho/OSGi) — 🚧 scaffolded, **not yet compiled**
+Written on the same machine, confirmed to also have no local Maven — same
+caveat as Phase 2. See `plugins/eclipse/README.md` for the full status and
+what to check first (target-platform resolution and Tycho version drift are
+the two biggest risk areas — historically more finicky than Gradle).
+
+- `XpreiChatView` (`ViewPart`) hosts an SWT `Browser` loading `webview/index.html`;
+  a `BrowserFunction` bridges JS→Java, `Browser.execute()` (always marshaled
+  onto the SWT UI thread via `Display.asyncExec`, since sidecar events arrive
+  on a background stdout-reader thread) bridges Java→JS.
+- `XpreiHostBridge` — the Java + `MiniJson` port of the IntelliJ plugin's
+  Kotlin class of the same name, translating the identical webview protocol
+  to the identical sidecar JSON-RPC protocol. Kept in sync manually with its
+  Kotlin counterpart (no module shared between the two JVM plugins).
+- `MiniJson` — a small, self-contained JSON codec written specifically to
+  avoid adding an Orbit p2 repository dependency (Gson/org.json aren't
+  guaranteed present in a bare Eclipse Platform target platform) on top of an
+  already-unverified Tycho build. The one class in this plugin with zero
+  Eclipse/OSGi dependencies — see the README for how to smoke-test it with
+  nothing but a bare JDK.
+- `SidecarProcess` + `WebviewResources`: same role as the IntelliJ plugin's,
+  Java instead of Kotlin.
+- `XpreiSettings` (`InstanceScope` preferences, JSON-blob serialized —
+  Eclipse preferences only store flat values) + `XpreiSecrets` (Equinox
+  Secure Storage, `ISecurePreferences`) for config/keys.
+- Tycho build: a parent `pom.xml` (target-platform-configuration pointing at
+  `download.eclipse.org/releases/latest`) + a child `eclipse-plugin` module
+  whose pom copies `webview/` and the bundled `sidecar.cjs` from their single
+  source of truth (same principle as the Gradle/npm copy steps in the other
+  two hosts) and runs `npm run build:sidecar` via `exec-maven-plugin`.
+- **MVP simplification specific to Eclipse:** workspace root resolution
+  picks the first open project's location (falling back to the workspace
+  root directory) since an Eclipse workspace can hold multiple projects,
+  unlike VS Code's single folder or JetBrains' `project.basePath` — a real
+  multi-project workspace isn't fully modeled yet.
+- Same MVP-scope simplifications as IntelliJ otherwise (single in-memory
+  session, insertAtCursor/applyEdit no-ops, no revert-last-run menu entry).
 
 ### Phase 4 — READMEs, branding, packaging, distribution
 - Root `README.md` (multi-IDE, Babbros / xprei.online / support@xprei.com) — see

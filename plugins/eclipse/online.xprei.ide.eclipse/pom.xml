@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>online.xprei.ide</groupId>
+    <artifactId>xpreiIDE-eclipse-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>online.xprei.ide.eclipse</artifactId>
+  <packaging>eclipse-plugin</packaging>
+
+  <!--
+    Tycho reads dependencies from META-INF/MANIFEST.MF, not this <dependencies>
+    section — deliberately absent. What this file DOES own: pulling in the
+    shared webview/ and the esbuild-bundled sidecar.cjs from their single
+    source of truth at the repo root, the same principle as the VS Code
+    extension's scripts/sync-webview.mjs and the IntelliJ plugin's Gradle
+    resources.srcDir wiring — just via Maven plugin executions here, since
+    Tycho's eclipse-plugin packaging needs bin.includes (build.properties) to
+    point at files that PHYSICALLY exist inside this module's directory, not
+    an external path.
+  -->
+  <build>
+    <plugins>
+      <!-- Runs the core's esbuild bundle step so this module always ships a
+           fresh sidecar.cjs. Requires Node.js on PATH at BUILD time (separate
+           from the Node.js >= 18 requirement at RUNTIME on the end user's
+           machine — see README.md). Bound to `initialize` so it completes
+           before the resource-copy execution below (generate-resources). -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.4.1</version>
+        <executions>
+          <execution>
+            <id>build-sidecar</id>
+            <phase>initialize</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <executable>npm</executable>
+              <workingDirectory>${project.basedir}/../../..</workingDirectory>
+              <arguments>
+                <argument>run</argument>
+                <argument>build:sidecar</argument>
+                <argument>--workspace</argument>
+                <argument>@xprei/core</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Copies webview/ and the bundled sidecar.cjs into this module's own
+           directory tree so Tycho's bin.includes (build.properties) can
+           reference them as physically-local paths. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <execution>
+            <id>copy-webview</id>
+            <phase>generate-resources</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${project.basedir}/webview</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../../../webview</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-sidecar</id>
+            <phase>generate-resources</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${project.basedir}</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../../../packages/core/dist</directory>
+                  <includes>
+                    <include>sidecar.cjs</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
