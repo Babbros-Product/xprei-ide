@@ -20,6 +20,7 @@ export * from "./context/mentions";
 export * from "./context/exclude";
 export * from "./context/urlSafety";
 export * from "./context/htmlStrip";
+export * from "./context/repomap";
 
 // Inline-edit prompt building
 export * from "./edit/prompt";
