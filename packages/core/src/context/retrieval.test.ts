@@ -1,0 +1,83 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  buildContextMessage,
+  FileContext,
+  formatFiles,
+  formatHits,
+  formatProblems,
+  ProblemInfo,
+} from "./retrieval";
+import { SearchHit } from "./vectorstore";
+
+test("formatFiles renders each file with a FILE header, joined by blank lines", () => {
+  const files: FileContext[] = [
+    { path: "a.ts", content: "const a = 1;" },
+    { path: "b.ts", content: "const b = 2;" },
+  ];
+  const out = formatFiles(files);
+  assert.equal(out, "// FILE: a.ts\nconst a = 1;\n\n// FILE: b.ts\nconst b = 2;");
+});
+
+test("formatFiles truncates content longer than maxChars", () => {
+  const files: FileContext[] = [{ path: "big.ts", content: "x".repeat(20) }];
+  const out = formatFiles(files, 10);
+  assert.match(out, /^\/\/ FILE: big\.ts\nx{10}\n…\(truncated\)$/);
+});
+
+test("formatFiles returns an empty string for an empty array", () => {
+  assert.equal(formatFiles([]), "");
+});
+
+test("formatHits renders each hit with a location/score header, drops hits below minScore", () => {
+  const hits: SearchHit[] = [
+    { score: 0.9, chunk: { id: "a#1", path: "a.ts", startLine: 1, endLine: 2, text: "code a" } },
+    { score: 0.1, chunk: { id: "b#1", path: "b.ts", startLine: 1, endLine: 1, text: "code b" } },
+  ];
+  const out = formatHits(hits);
+  assert.match(out, /a\.ts:1-2 \(score 0\.90\)/);
+  assert.doesNotMatch(out, /b\.ts/);
+});
+
+test("formatHits returns an empty string when every hit is below minScore", () => {
+  const hits: SearchHit[] = [
+    { score: 0.05, chunk: { id: "a#1", path: "a.ts", startLine: 1, endLine: 1, text: "x" } },
+  ];
+  assert.equal(formatHits(hits), "");
+});
+
+test("formatProblems renders one line per diagnostic with path, line, severity, message", () => {
+  const problems: ProblemInfo[] = [
+    { path: "a.ts", line: 12, severity: "error", message: "Type 'string' is not assignable to type 'number'." },
+    { path: "b.ts", line: 3, severity: "warning", message: "Unused variable 'x'." },
+  ];
+  const out = formatProblems(problems);
+  assert.equal(
+    out,
+    "// a.ts:12 (error) Type 'string' is not assignable to type 'number'.\n" +
+      "// b.ts:3 (warning) Unused variable 'x'.",
+  );
+});
+
+test("formatProblems returns an empty string for an empty array", () => {
+  assert.equal(formatProblems([]), "");
+});
+
+test("buildContextMessage assembles files, problems, and retrieved sections in that order", () => {
+  const out = buildContextMessage({
+    files: "// FILE: a.ts\ncontent",
+    problems: "// a.ts:1 (error) bad",
+    retrieved: "// a.ts:1-2 (score 0.90)\ncode",
+  });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n" +
+      "// FILE: a.ts\ncontent\n\n" +
+      "// a.ts:1 (error) bad\n\n" +
+      "// Relevant code from the workspace:\n// a.ts:1-2 (score 0.90)\ncode",
+  );
+});
+
+test("buildContextMessage returns an empty string when every part is empty", () => {
+  assert.equal(buildContextMessage({}), "");
+});
