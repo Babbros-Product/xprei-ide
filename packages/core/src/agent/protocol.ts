@@ -16,7 +16,8 @@ export interface ToolSpec {
 
 export type Action =
   | { kind: "tool"; tool: string; args: Record<string, unknown>; thought?: string }
-  | { kind: "final"; text: string; thought?: string };
+  | { kind: "final"; text: string; thought?: string }
+  | { kind: "protocolError"; reason: string; thought?: string };
 
 // System prompt: describes the tools and pins the exact response contract.
 export function buildAgentSystemPrompt(tools: ToolSpec[], cwd: string): string {
@@ -49,6 +50,15 @@ export function buildAgentSystemPrompt(tools: ToolSpec[], cwd: string): string {
   ].join("\n");
 }
 
+const NO_JSON_REASON =
+  'Your reply did not contain a JSON object. Respond with exactly one JSON ' +
+  'object: either a tool call {"tool": "<name>", "args": {...}} or ' +
+  '{"final": "<summary>"}. No prose outside the JSON.';
+
+const MISSING_KEY_REASON =
+  'Your JSON object had neither a "tool" nor a "final" key. To call a tool: ' +
+  '{"tool": "<name>", "args": {...}}. To finish: {"final": "<summary>"}.';
+
 // Extract the model's action from a raw completion. Tolerant of fenced blocks
 // and surrounding prose. If nothing parses as an action, treat the whole reply
 // as a final answer so the loop never hangs on a chatty model.
@@ -70,10 +80,14 @@ export function parseAction(raw: string): Action {
           : {};
       return { kind: "tool", tool: rec.tool, args, thought };
     }
+    // Valid JSON, but neither a tool call nor a final answer.
+    return { kind: "protocolError", reason: MISSING_KEY_REASON, thought };
   }
 
-  // No actionable JSON — the model just talked. Treat as the final message.
-  return { kind: "final", text: text || "(no response)" };
+  // No parseable JSON object at all — a protocol violation the model can
+  // correct on retry, not a legitimate final answer (a real answer already
+  // comes wrapped as {"final": "..."}).
+  return { kind: "protocolError", reason: NO_JSON_REASON };
 }
 
 // Find the first balanced {...} that JSON-parses. Strips ```json fences first.

@@ -31,10 +31,19 @@ test("parseAction ignores trailing prose after a balanced object", () => {
   if (a.kind === "tool") assert.equal(a.args.query, "foo");
 });
 
-test("parseAction falls back to final for non-JSON chatter", () => {
+test("parseAction returns protocolError for non-JSON chatter", () => {
   const a = parseAction("I think the bug is in auth.ts");
-  assert.equal(a.kind, "final");
-  if (a.kind === "final") assert.match(a.text, /auth\.ts/);
+  assert.equal(a.kind, "protocolError");
+  if (a.kind === "protocolError") assert.match(a.reason, /did not contain a JSON object/);
+});
+
+test("parseAction returns protocolError when JSON has neither tool nor final", () => {
+  const a = parseAction('{"thought":"hmm","action":"read_file"}');
+  assert.equal(a.kind, "protocolError");
+  if (a.kind === "protocolError") {
+    assert.match(a.reason, /neither a "tool" nor a "final" key/);
+    assert.equal(a.thought, "hmm");
+  }
 });
 
 test("parseAction handles braces inside strings", () => {

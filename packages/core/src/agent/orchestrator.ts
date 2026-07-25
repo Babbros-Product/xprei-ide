@@ -88,6 +88,13 @@ export class Agent {
         return;
       }
 
+      if (action.kind === "protocolError") {
+        const observation = action.reason;
+        this.deps.events.onObservation(observation);
+        messages.push({ role: "user", content: `Observation:\n${observation}` });
+        continue;
+      }
+
       const observation = await this.runTool(action);
       this.deps.events.onObservation(observation);
       // Feed the result back as the next user turn (universal across models;
