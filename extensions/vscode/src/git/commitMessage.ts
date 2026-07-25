@@ -4,26 +4,7 @@
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
 import { stripCodeFences } from "@xprei/core";
-
-// Minimal ambient typing for the subset of the built-in "vscode.git"
-// extension's API this module uses — that extension ships no public .d.ts.
-interface GitRepository {
-  inputBox: { value: string };
-  diff(cached?: boolean): Promise<string>;
-}
-interface GitAPI {
-  repositories: GitRepository[];
-}
-interface GitExtensionExports {
-  getAPI(version: 1): GitAPI;
-}
-
-async function getGitApi(): Promise<GitAPI | undefined> {
-  const ext = vscode.extensions.getExtension<GitExtensionExports>("vscode.git");
-  if (!ext) return undefined;
-  const exports = ext.isActive ? ext.exports : await ext.activate();
-  return exports.getAPI(1);
-}
+import { getGitApi } from "./gitApi";
 
 const SYSTEM_PROMPT =
   "You write concise, conventional git commit messages: a type prefix " +
