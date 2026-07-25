@@ -109,6 +109,9 @@ export async function runAgent(
   const maxSteps = vscode.workspace
     .getConfiguration("xpreiIDE")
     .get<number>("agent.maxSteps", 0);
+  const protocolRetries = vscode.workspace
+    .getConfiguration("xpreiIDE")
+    .get<number>("agent.protocolRetries", 2);
 
   const events: AgentEvents = {
     onStep: (n) => post({ type: "agent", kind: "step", n }),
@@ -118,6 +121,8 @@ export async function runAgent(
     onFinal: (t) => post({ type: "agent", kind: "final", text: t }),
     onError: (t) => post({ type: "agent", kind: "error", text: t }),
     onEdit: (path, before, after) => flashAgentEdit(host.cwd, path, before, after),
+    onProtocolError: (attempt, maxAttempts, reason) =>
+      post({ type: "agent", kind: "protocolError", text: reason, attempt, maxAttempts }),
   };
 
   const agent = new Agent({
@@ -127,6 +132,7 @@ export async function runAgent(
     approver: new ChatApprover(autoApprove, requestApproval),
     events,
     maxSteps,
+    protocolRetries,
     tools: mode === "edit" ? EDIT_MODE_TOOLS : TOOLS,
     projectRules,
   });

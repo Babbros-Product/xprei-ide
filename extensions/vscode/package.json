@@ -223,6 +223,11 @@
           "default": false,
           "description": "Skip the approval prompt for file writes and terminal commands during agent runs. Use with caution."
         },
+        "xpreiIDE.agent.protocolRetries": {
+          "type": "number",
+          "default": 2,
+          "description": "How many times the agent retries when a model's reply isn't valid JSON (weaker/local models drift out of format more often) before giving up with an error. 0 = fail on the first bad reply."
+        },
         "xpreiIDE.completions.enabled": {
           "type": "boolean",
           "default": true,

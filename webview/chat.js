@@ -567,6 +567,12 @@
       case "observation":
         addMessage("agent-obs", msg.text);
         break;
+      case "protocolError":
+        addMessage(
+          "agent-warning",
+          "⚠ Model reply wasn't valid — retrying (" + msg.attempt + "/" + msg.maxAttempts + ")…",
+        );
+        break;
       case "approval":
         addApprovalCard(msg.tool, msg.text, msg.before, msg.after);
         break;
