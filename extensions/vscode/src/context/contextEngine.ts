@@ -32,6 +32,7 @@ import {
 } from "@xprei/core";
 import { VectorStore, SearchHit } from "@xprei/core";
 import { isExcludedPath, SCAN_EXCLUDE } from "@xprei/core";
+import { loadIgnorePatterns } from "./ignoreFile";
 
 const INDEX_FILE = "index.json";
 const EMBED_BATCH = 64;
@@ -102,6 +103,7 @@ export class ContextEngine {
     }
 
     const uris = await vscode.workspace.findFiles("**/*", SCAN_EXCLUDE);
+    const ignorePatterns = await loadIgnorePatterns();
     this.store.clear();
 
     let dimConfigured = false;
@@ -121,6 +123,7 @@ export class ContextEngine {
     };
 
     for (const uri of uris) {
+      if (isExcludedPath(this.rel(uri), ignorePatterns)) continue;
       if (token?.isCancellationRequested) break;
       const chunks = await this.chunksFor(uri);
       for (const c of chunks) {
@@ -138,7 +141,8 @@ export class ContextEngine {
 
   async updateFile(uri: vscode.Uri): Promise<void> {
     const path = this.rel(uri);
-    if (isExcludedPath(path)) return; // never index node_modules/.git/dist/...
+    const ignorePatterns = await loadIgnorePatterns();
+    if (isExcludedPath(path, ignorePatterns)) return; // never index node_modules/.git/dist/...
     await this.load();
     if (this.store.size === 0) return; // no index built yet; skip
     const embedder = await this.embedder();
@@ -155,7 +159,8 @@ export class ContextEngine {
 
   async removeFile(uri: vscode.Uri): Promise<void> {
     const path = this.rel(uri);
-    if (isExcludedPath(path)) return; // excluded paths are never in the index
+    const ignorePatterns = await loadIgnorePatterns();
+    if (isExcludedPath(path, ignorePatterns)) return; // excluded paths are never in the index
     await this.load();
     this.store.removeByPath(path);
     await this.persist();
@@ -341,9 +346,10 @@ export class ContextEngine {
   // an explicit @file: mention (that file is inlined once, via the file
   // tier).
   private async readOpenFiles(excludePaths: Set<string>): Promise<FileContext[]> {
+    const ignorePatterns = await loadIgnorePatterns();
     const out: FileContext[] = [];
     for (const { uri, path } of this.openTabPaths()) {
-      if (isExcludedPath(path)) continue;
+      if (isExcludedPath(path, ignorePatterns)) continue;
       if (excludePaths.has(path)) continue;
       try {
         const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
@@ -591,13 +597,16 @@ export class ContextEngine {
   // are silently skipped, not listed with an empty symbol list.
   private async buildRepoMap(): Promise<FileSymbols[]> {
     const uris = await vscode.workspace.findFiles("**/*", SCAN_EXCLUDE, MAX_REPOMAP_FILES);
+    const ignorePatterns = await loadIgnorePatterns();
     const out: FileSymbols[] = [];
     for (const uri of uris) {
+      const rel = this.rel(uri);
+      if (isExcludedPath(rel, ignorePatterns)) continue;
       try {
         const stat = await vscode.workspace.fs.stat(uri);
         if (stat.size > MAX_FILE_BYTES) continue;
         const bytes = await vscode.workspace.fs.readFile(uri);
-        const result = extractSymbols(this.rel(uri), Buffer.from(bytes).toString("utf8"));
+        const result = extractSymbols(rel, Buffer.from(bytes).toString("utf8"));
         if (result) out.push(result);
       } catch {
         // ignore unreadable files
