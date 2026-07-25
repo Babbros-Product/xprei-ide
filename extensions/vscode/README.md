@@ -69,9 +69,10 @@ model's rewrite appears as an inline red(old)/green(new) diff — **Enter** acce
 ## Agent (autonomous multi-file)
 
 Tick **Agent** in the chat composer, describe a task (e.g. *"add a /health route
-and a test"*), and Send. The agent runs a tool loop — `read_file`, `list_dir`,
-`grep`, `create_file`, `edit_file`, `run_terminal` — one step at a time, streaming
-its thoughts, tool calls, and observations into the transcript.
+and a test"*), and Send. The agent runs a tool loop — `read_file`, `read_file_range`,
+`list_dir`, `grep`, `glob_search`, `view_diff`, `create_file`, `edit_file`,
+`run_terminal` — one step at a time, streaming its thoughts, tool calls, and
+observations into the transcript.
 
 - **Universal protocol.** No reliance on native function-calling: every model
   speaks one JSON tool protocol (`src/agent/protocol.ts`), so local Ollama models

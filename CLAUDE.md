@@ -157,6 +157,12 @@ inlined the core into `dist/extension.js`.
 - **Commits:** author `xpreiIDE <mbsajay1@gmail.com>`; footer
   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`. Conventional prefixes
   (feat/fix). Line endings: `.gitattributes` forces LF.
+- **User-facing docs stay current.** `extensions/vscode/README.md` is the
+  plain-language, per-feature setup+usage doc (Marketplace copy); the root
+  `README.md`'s "Features" list is the short cross-IDE summary of the same
+  set. Every implementation plan that adds or changes a user-facing feature
+  must include a task updating both, in the same commit as the feature —
+  not deferred to a later cleanup pass.
 
 ## Deferred / known gaps
 
