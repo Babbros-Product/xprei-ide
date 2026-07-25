@@ -99,6 +99,35 @@ export class OllamaProvider implements Provider {
   }
 
   async embed(texts: string[], model: string, signal?: AbortSignal): Promise<number[][]> {
+    if (texts.length === 0) return [];
+    // Prefer the batch endpoint (/api/embed, Ollama >= 0.1.x): one round-trip
+    // for the whole batch instead of one request per text. Falls back to the
+    // legacy per-text /api/embeddings on an older daemon that lacks it.
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/api/embed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify({ model, input: texts }),
+      });
+    } catch (err) {
+      if (isAbortError(err)) throw err;
+      throw new ProviderError(this.unreachable(), err);
+    }
+    if (res.status === 404) return this.embedEach(texts, model, signal);
+    if (!res.ok) throw new ProviderError(`Ollama /api/embed: ${res.status}`);
+    const data = (await res.json()) as { embeddings?: number[][] };
+    return data.embeddings ?? [];
+  }
+
+  // Legacy fallback: /api/embeddings takes a single `prompt` and returns one
+  // vector, so a batch is N sequential requests.
+  private async embedEach(
+    texts: string[],
+    model: string,
+    signal?: AbortSignal,
+  ): Promise<number[][]> {
     const out: number[][] = [];
     for (const prompt of texts) {
       const res = await fetch(`${this.baseUrl}/api/embeddings`, {

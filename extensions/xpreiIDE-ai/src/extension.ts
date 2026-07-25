@@ -26,18 +26,40 @@ export function activate(context: vscode.ExtensionContext): void {
   const chat = new ChatViewProvider(context.extensionUri, registry, engine, context.workspaceState);
   const inlineEdit = new InlineEditController(registry);
 
-  // Keep the index fresh as the user edits.
+  // Keep the index fresh as the user edits. Debounce per-path so a burst of
+  // saves (or a bulk operation like `npm install`) collapses into one re-embed
+  // per file; the engine itself skips excluded dirs (node_modules/.git/…).
   const watcher = vscode.workspace.createFileSystemWatcher("**/*");
-  watcher.onDidCreate((uri) => void engine.updateFile(uri));
-  watcher.onDidChange((uri) => void engine.updateFile(uri));
-  watcher.onDidDelete((uri) => void engine.removeFile(uri));
+  const updateTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const WATCH_DEBOUNCE_MS = 500;
+  const scheduleUpdate = (uri: vscode.Uri) => {
+    const key = uri.toString();
+    clearTimeout(updateTimers.get(key));
+    updateTimers.set(
+      key,
+      setTimeout(() => {
+        updateTimers.delete(key);
+        void engine.updateFile(uri);
+      }, WATCH_DEBOUNCE_MS),
+    );
+  };
+  watcher.onDidCreate(scheduleUpdate);
+  watcher.onDidChange(scheduleUpdate);
+  watcher.onDidDelete((uri) => {
+    const key = uri.toString();
+    clearTimeout(updateTimers.get(key)); // cancel any pending re-embed
+    updateTimers.delete(key);
+    void engine.removeFile(uri);
+  });
 
   context.subscriptions.push(
     log,
     watcher,
     inlineEdit,
     vscode.languages.registerInlineCompletionItemProvider(
-      { pattern: "**" },
+      // Real editable documents only — not diff views, output panels, the
+      // settings editor, or other read-only/virtual schemes.
+      [{ scheme: "file" }, { scheme: "untitled" }],
       new InlineCompletionProvider(registry),
     ),
     vscode.commands.registerCommand("xpreiIDE.inlineEdit", () => inlineEdit.run()),

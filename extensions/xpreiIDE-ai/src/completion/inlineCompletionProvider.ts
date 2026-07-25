@@ -25,6 +25,10 @@ const SYSTEM_PROMPT =
 
 export class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
   private debounceTimer?: ReturnType<typeof setTimeout>;
+  // One-entry cache: VS Code re-requests completions on cursor moves and
+  // re-renders; if the surrounding code is unchanged, reuse the last result
+  // instead of hitting the model again (matters most for slow local models).
+  private cache?: { key: string; text: string };
 
   constructor(private readonly registry: ProviderRegistry) {}
 
@@ -47,6 +51,12 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     const prefix = prefixText(document, position);
     if (!prefix.trim()) return undefined;
     const suffix = suffixText(document, position);
+
+    // Serve from cache when the surrounding code is byte-for-byte identical.
+    const cacheKey = `${prefix}\u0000${suffix}`;
+    if (this.cache?.key === cacheKey) {
+      return [new vscode.InlineCompletionItem(this.cache.text, new vscode.Range(position, position))];
+    }
 
     const userContent = suffix.trim()
       ? `Code before <CURSOR>:\n${prefix}<CURSOR>\nCode after <CURSOR>:\n${suffix}`
@@ -79,6 +89,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     const text = clip(stripCodeFences(out));
     if (!text.trim()) return undefined;
 
+    this.cache = { key: cacheKey, text };
     return [new vscode.InlineCompletionItem(text, new vscode.Range(position, position))];
   }
 

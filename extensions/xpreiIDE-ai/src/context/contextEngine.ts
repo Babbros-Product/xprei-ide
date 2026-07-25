@@ -14,13 +14,12 @@ import {
   formatHits,
 } from "./retrieval";
 import { VectorStore } from "./vectorstore";
+import { isExcludedPath, SCAN_EXCLUDE } from "./exclude";
 
 const INDEX_FILE = "index.json";
 const EMBED_BATCH = 64;
 const MAX_FILE_BYTES = 200 * 1024;
 const RETRIEVE_K = 6;
-const SCAN_EXCLUDE =
-  "**/{node_modules,.git,dist,out,build,.next,.turbo,coverage,vendor,.venv,__pycache__}/**";
 
 export class ContextEngine {
   private store = new VectorStore();
@@ -109,12 +108,13 @@ export class ContextEngine {
   }
 
   async updateFile(uri: vscode.Uri): Promise<void> {
+    const path = this.rel(uri);
+    if (isExcludedPath(path)) return; // never index node_modules/.git/dist/...
     await this.load();
     if (this.store.size === 0) return; // no index built yet; skip
     const embedder = await this.embedder();
     if (!embedder || embedder.key !== this.store.modelKey) return;
 
-    const path = this.rel(uri);
     this.store.removeByPath(path);
     const chunks = await this.chunksFor(uri);
     if (chunks.length > 0) {
@@ -125,8 +125,10 @@ export class ContextEngine {
   }
 
   async removeFile(uri: vscode.Uri): Promise<void> {
+    const path = this.rel(uri);
+    if (isExcludedPath(path)) return; // excluded paths are never in the index
     await this.load();
-    this.store.removeByPath(this.rel(uri));
+    this.store.removeByPath(path);
     await this.persist();
   }
 
