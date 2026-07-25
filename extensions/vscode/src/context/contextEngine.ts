@@ -12,11 +12,14 @@ import { hasContextRequest, Mentions } from "@xprei/core";
 import {
   buildContextMessage,
   budgetContext,
+  extractSymbols,
   FileContext,
+  FileSymbols,
   formatDiff,
   formatFiles,
   formatHits,
   formatProblems,
+  formatRepoMap,
   formatTerminal,
   formatUrl,
   isBlockedAddress,
@@ -45,6 +48,7 @@ const SHELL_INTEGRATION_TIMEOUT_MS = 5_000;
 const MAX_URL_BYTES = 500_000;
 const URL_FETCH_TIMEOUT_MS = 10_000;
 const MAX_URL_REDIRECTS = 5;
+const MAX_REPOMAP_FILES = 500;
 
 export class ContextEngine {
   private store = new VectorStore();
@@ -165,10 +169,10 @@ export class ContextEngine {
   // ("skip", compact and actionable) > @diff ("break", one segment) >
   // @terminal ("break", one segment, confirmation-gated) > @url
   // ("break", one segment, SSRF-checked) > @open ("break", bulkier,
-  // ordered like files) > @codebase hits ("skip", a relevance guess).
-  // Every tier is built unconditionally (even when empty) —
-  // budgetContext's return value is positionally aligned with the input
-  // tier array.
+  // ordered like files) > @repomap ("skip", per-file symbol summaries) >
+  // @codebase hits ("skip", a relevance guess). Every tier is built
+  // unconditionally (even when empty) — budgetContext's return value is
+  // positionally aligned with the input tier array.
   async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
@@ -193,6 +197,7 @@ export class ContextEngine {
       ? await this.runTerminalCommand(mentions.terminalCommand)
       : "";
     const urlContent = mentions.url ? await this.fetchUrl(mentions.url) : "";
+    const repoFiles = mentions.repomap ? await this.buildRepoMap() : [];
 
     const fileTier: SegmentTier = {
       segments: files.map((f) => ({ text: f.content, data: f })),
@@ -220,6 +225,13 @@ export class ContextEngine {
       segments: openFiles.map((f) => ({ text: f.content, data: f })),
       strategy: "break",
     };
+    const repomapTier: SegmentTier = {
+      segments: repoFiles.map((f) => ({
+        text: `// ${f.path}: ${f.symbols.join(", ")}`,
+        data: f,
+      })),
+      strategy: "skip",
+    };
     const eligibleHits = hits.filter((h) => h.score >= MIN_SCORE);
     const hitTier: SegmentTier = {
       segments: eligibleHits.map((h) => ({ text: h.chunk.text, data: h })),
@@ -233,9 +245,10 @@ export class ContextEngine {
       keptTerminalSegs,
       keptUrlSegs,
       keptOpenSegs,
+      keptRepomapSegs,
       keptHitSegs,
     ] = budgetContext(
-      [fileTier, problemTier, diffTier, terminalTier, urlTier, openTier, hitTier],
+      [fileTier, problemTier, diffTier, terminalTier, urlTier, openTier, repomapTier, hitTier],
       contextWindow,
     );
 
@@ -259,6 +272,8 @@ export class ContextEngine {
       ...(seg.data as FileContext),
       content: seg.text,
     }));
+    // "skip" never truncates, so seg.data can be used raw.
+    const budgetedRepoFiles: FileSymbols[] = keptRepomapSegs.map((seg) => seg.data as FileSymbols);
     // "skip" never truncates, so seg.text === chunk.text and data can be used raw.
     // If this tier ever becomes "break", reconstruct from seg.text like files do.
     const budgetedHits: SearchHit[] = keptHitSegs.map((seg) => seg.data as SearchHit);
@@ -271,6 +286,7 @@ export class ContextEngine {
       diff: budgetedDiff,
       terminal: budgetedTerminal,
       url: budgetedUrl,
+      repomap: budgetedRepoFiles.length ? formatRepoMap(budgetedRepoFiles) : undefined,
       retrieved: budgetedHits.length ? formatHits(budgetedHits, Number.NEGATIVE_INFINITY) : undefined,
     });
   }
@@ -566,6 +582,28 @@ export class ContextEngine {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  // Walks the workspace (capped at MAX_REPOMAP_FILES) and extracts a
+  // lightweight per-file symbol summary via extractSymbols() — no AST,
+  // no cross-file reference graph or ranking (v1 scope, see the design
+  // doc). Unreadable files and files extractSymbols() finds nothing in
+  // are silently skipped, not listed with an empty symbol list.
+  private async buildRepoMap(): Promise<FileSymbols[]> {
+    const uris = await vscode.workspace.findFiles("**/*", SCAN_EXCLUDE, MAX_REPOMAP_FILES);
+    const out: FileSymbols[] = [];
+    for (const uri of uris) {
+      try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if (stat.size > MAX_FILE_BYTES) continue;
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        const result = extractSymbols(this.rel(uri), Buffer.from(bytes).toString("utf8"));
+        if (result) out.push(result);
+      } catch {
+        // ignore unreadable files
+      }
+    }
+    return out;
   }
 
   private resolveRel(p: string): vscode.Uri | undefined {
