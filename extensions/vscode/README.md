@@ -39,6 +39,18 @@ For `openai-compat` providers, run **xpreiIDE: Set Provider API Key** (stored
 in the OS keychain via SecretStorage, never in settings). `baseUrl` must include
 the API version segment (e.g. `/v1`).
 
+## Per-role models
+
+By default, chat, completions, the agent, inline edit (Cmd-K), and commit-
+message generation all use whatever model **xpreiIDE: Select Model** set
+for chat. To use a different model for one of them — e.g. a small, fast
+local model for completions while a larger model drives the agent — run
+**xpreiIDE: Select Model for Role...**, pick a role, then pick a provider
+and model as usual. Roles left unconfigured keep following the chat model
+automatically; running the command again on a role you've already
+overridden offers a **"Clear override"** option to revert it back to
+following chat.
+
 ## Architecture
 
 | Layer | Files |
