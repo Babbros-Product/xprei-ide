@@ -71,6 +71,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private pendingSeed?: string;
   private sessions: StoredSession[];
   private currentSessionId: string;
+  // Mirrors InlineEditController's convention elsewhere in this extension
+  // (a field per vscode-owned resource, disposed in `dispose()`, and the
+  // instance itself pushed onto context.subscriptions by extension.ts).
+  private readonly configListener: vscode.Disposable;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -82,6 +86,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (this.sessions.length === 0) this.sessions.push(newSession());
     this.currentSessionId = this.sessions[this.sessions.length - 1].id;
     this.history = [...this.currentSession().history];
+
+    // Auto-discovery (and any other out-of-band writer) sets activeModel/
+    // providers outside the webview's own message handlers (ready/
+    // selectModel/save/removeProvider), so the composer's cached model
+    // label would otherwise stay stale ("Select model") until reload.
+    this.configListener = vscode.workspace.onDidChangeConfiguration((e) => {
+      if (
+        e.affectsConfiguration("xpreiIDE.activeModel") ||
+        e.affectsConfiguration("xpreiIDE.providers")
+      ) {
+        void this.sendModels();
+      }
+    });
+  }
+
+  dispose(): void {
+    this.configListener.dispose();
   }
 
   private currentSession(): StoredSession {

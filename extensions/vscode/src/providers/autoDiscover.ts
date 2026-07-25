@@ -12,41 +12,50 @@ const OLLAMA_URL = "http://localhost:11434";
 const PROBE_TIMEOUT_MS = 1500;
 
 export async function tryAutoDiscoverOllama(registry: ProviderRegistry): Promise<void> {
-  const settings = vscode.workspace.getConfiguration("xpreiIDE");
-  // Already configured — never probe, never nag.
-  if (settings.get<string>("activeModel", "")) return;
+  // Everything below reads user-edited settings/config (activeModel check,
+  // findLocalOllamaConfig's c.baseUrl access on unvalidated ProviderConfig
+  // objects, etc.) and is called fire-and-forget by the caller. Wrapping the
+  // whole body is the outer safety net that keeps the module's "never
+  // rejects" contract true by construction, regardless of what throws inside.
+  try {
+    const settings = vscode.workspace.getConfiguration("xpreiIDE");
+    // Already configured — never probe, never nag.
+    if (settings.get<string>("activeModel", "")) return;
 
-  const cfg = findLocalOllamaConfig(registry.getConfigs());
-  // The default config was removed/renamed by the user; don't recreate it.
-  if (!cfg) return;
+    const cfg = findLocalOllamaConfig(registry.getConfigs());
+    // The default config was removed/renamed by the user; don't recreate it.
+    if (!cfg) return;
 
-  const models = await probeModels(registry, cfg);
-  if (!models) return; // unreachable, timed out, or errored — stay silent
+    const models = await probeModels(registry, cfg);
+    if (!models) return; // unreachable, timed out, or errored — stay silent
 
-  if (models.length === 0) {
-    vscode.window.showInformationMessage(
-      "Ollama is running but has no models installed yet. " +
-        "Try 'ollama pull llama3.1', then reload the window.",
+    if (models.length === 0) {
+      vscode.window.showInformationMessage(
+        "Ollama is running but has no models installed yet. " +
+          "Try 'ollama pull llama3.1', then reload the window.",
+      );
+      return;
+    }
+
+    if (models.length === 1) {
+      await setActiveModel(cfg.id, models[0]);
+      return;
+    }
+
+    const action = await vscode.window.showInformationMessage(
+      `Ollama detected with ${models.length} models — use it for chat?`,
+      "Use Ollama",
     );
+    if (action !== "Use Ollama") return;
+
+    const model = await vscode.window.showQuickPick(models, {
+      placeHolder: "Select a chat model",
+    });
+    if (!model) return;
+    await setActiveModel(cfg.id, model);
+  } catch {
     return;
   }
-
-  if (models.length === 1) {
-    await setActiveModel(cfg.id, models[0]);
-    return;
-  }
-
-  const action = await vscode.window.showInformationMessage(
-    `Ollama detected with ${models.length} models — use it for chat?`,
-    "Use Ollama",
-  );
-  if (action !== "Use Ollama") return;
-
-  const model = await vscode.window.showQuickPick(models, {
-    placeHolder: "Select a chat model",
-  });
-  if (!model) return;
-  await setActiveModel(cfg.id, model);
 }
 
 function findLocalOllamaConfig(configs: ProviderConfig[]): ProviderConfig | undefined {
@@ -75,6 +84,15 @@ async function probeModels(
 
 async function setActiveModel(providerId: string, model: string): Promise<void> {
   try {
+    // Re-check right before writing: a lingering "Use Ollama" notification
+    // (VS Code notifications with action buttons don't auto-dismiss) can
+    // resolve long after the user configured a model some other way. If
+    // activeModel is no longer empty, something else already claimed it —
+    // don't clobber it and don't show a success message for a write that
+    // didn't happen.
+    const current = vscode.workspace.getConfiguration("xpreiIDE").get<string>("activeModel", "");
+    if (current) return;
+
     await vscode.workspace
       .getConfiguration("xpreiIDE")
       .update(

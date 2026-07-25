@@ -105,6 +105,7 @@ export function activate(context: vscode.ExtensionContext): void {
     log,
     watcher,
     inlineEdit,
+    chat,
     vscode.languages.registerInlineCompletionItemProvider(
       // Real editable documents only — not diff views, output panels, the
       // settings editor, or other read-only/virtual schemes.
