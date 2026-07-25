@@ -170,5 +170,11 @@ inlined the core into `dist/extension.js`.
 - Brute-force cosine search (fine to a few-k chunks; upgrade to LanceDB/sqlite-vss later).
 - Static per-provider capabilities (no per-model tool detection).
 - Unbounded chat history (no trimming yet).
+- `ProviderRegistry.removeConfig()` doesn't scrub the 6 model-pointer
+  settings (`activeModel`/`embedModel`/`completionModel`/`agentModel`/
+  `inlineEditModel`/`commitMessageModel`) when the provider they reference
+  is removed — a stale pointer now degrades gracefully at resolve time
+  (falls back to `activeModel`, per `resolvePointer`), but the stale
+  setting value itself is never cleaned up.
 - Inline edit applies once on completion, not token-by-token into the buffer.
 - Agent feeds observations as `user` turns (not a `tool` role) for OSS compatibility.
