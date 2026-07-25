@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!--
+  Host-agnostic shell for the shared xpreiIDE chat UI. VS Code does NOT load
+  this file — extensions/xpreiIDE-ai/src/ui/chat/chatView.ts generates its own
+  HTML (VS Code's webview model needs asWebviewUri()-rewritten asset paths and
+  a nonce-based CSP that only its webview host understands). This file is for
+  every OTHER host: JetBrains loads it into a JBCefBrowser, Eclipse into an SWT
+  Browser, and it also works standalone in a plain browser for manual UI work
+  on chat.js/chat.css without spinning up an IDE.
+
+  The <body> here is kept byte-for-byte in sync with chatView.ts's html()
+  method — chat.js finds every element by a fixed id, so the two must not
+  drift. If you change one, change the other.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="theme-fallback.css" rel="stylesheet" />
+  <link href="chat.css" rel="stylesheet" />
+</head>
+<body>
+  <div id="chatHeader" class="chatHeader">
+    <span class="title">xpreiIDE</span>
+    <div class="headerActions">
+      <button type="button" id="newChatBtn" class="iconBtn" title="New chat" aria-label="New chat">+</button>
+      <button type="button" id="historyBtn" class="iconBtn" title="Chat history" aria-label="Chat history">🕓</button>
+      <button type="button" id="gearBtn" class="iconBtn" title="Model settings" aria-label="Model settings">⚙</button>
+    </div>
+  </div>
+  <div id="historyPanel" class="settingsPanel hidden">
+    <div class="settingsSection">
+      <div class="settingsSectionTitle">Chats</div>
+      <div id="sessionList" class="providerList"></div>
+    </div>
+  </div>
+  <div id="settingsPanel" class="settingsPanel hidden">
+    <div class="settingsSection">
+      <div class="settingsSectionTitle">Providers</div>
+      <div id="providerList" class="providerList"></div>
+    </div>
+    <div class="settingsSection">
+      <div class="settingsSectionTitle">Add provider</div>
+      <form id="addProviderForm" class="addProviderForm">
+        <label class="field">
+          <span>Kind</span>
+          <select id="cfgKind" aria-label="Provider kind">
+            <option value="openai-compat">OpenAI-compatible (OpenAI, Gemini, …)</option>
+            <option value="ollama">Ollama (local)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Label</span>
+          <input id="cfgLabel" type="text" placeholder="e.g. OpenAI" />
+        </label>
+        <label class="field">
+          <span>Base URL</span>
+          <input id="cfgBaseUrl" type="text" placeholder="https://api.openai.com/v1" />
+        </label>
+        <label class="field">
+          <span>Default model <em>(optional)</em></span>
+          <input id="cfgModel" type="text" placeholder="e.g. gpt-4o-mini" />
+        </label>
+        <label class="field" id="cfgApiKeyField">
+          <span>API key</span>
+          <input id="cfgApiKey" type="password" placeholder="sk-…" autocomplete="off" />
+        </label>
+        <button type="submit" id="saveProviderBtn" class="primary">Save provider</button>
+      </form>
+    </div>
+  </div>
+  <div id="messages"></div>
+  <form id="composer">
+    <div class="inputWrap">
+      <textarea id="input" rows="3" placeholder="Ask xpreiIDE…  (Enter to send, Shift+Enter for newline)"></textarea>
+      <button type="submit" id="sendBtn" class="sendIconBtn" title="Send" aria-label="Send">➤</button>
+    </div>
+    <div class="row toolbarRow">
+      <div class="modelPicker" id="modelPicker">
+        <button type="button" id="modelTrigger" class="modelTrigger" aria-haspopup="listbox" aria-expanded="false" title="Select model">
+          <span class="modelTriggerLabel" id="modelTriggerLabel">Select model</span>
+          <span class="modelTriggerCaret" aria-hidden="true">▾</span>
+        </button>
+        <div class="modelPopup hidden" id="modelPopup" role="dialog" aria-label="Select model">
+          <input type="text" id="modelSearch" class="modelSearch" placeholder="Search models…" aria-label="Search models" autocomplete="off" spellcheck="false" />
+          <div class="modelList" id="modelList" role="listbox" aria-label="Models"></div>
+        </div>
+      </div>
+      <button type="button" id="addModelBtn" class="iconBtn addModelBtn" title="Add provider" aria-label="Add provider">+</button>
+      <div class="modeSelector" role="radiogroup" aria-label="Mode">
+        <button type="button" class="modeBtn active" data-mode="plan">Plan</button>
+        <button type="button" class="modeBtn" data-mode="edit">Edit</button>
+        <button type="button" class="modeBtn" data-mode="agent">Agent</button>
+      </div>
+      <span class="spacer"></span>
+      <button type="button" id="stopBtn" class="ghostBtn" disabled>Stop</button>
+      <button type="button" id="resetBtn" class="ghostBtn">Reset</button>
+    </div>
+  </form>
+  <script src="bridge.js"></script>
+  <script src="chat.js"></script>
+</body>
+</html>
