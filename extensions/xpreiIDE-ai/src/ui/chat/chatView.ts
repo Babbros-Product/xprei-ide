@@ -504,7 +504,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       <button type="submit" id="sendBtn" class="sendIconBtn" title="Send" aria-label="Send">➤</button>
     </div>
     <div class="row toolbarRow">
-      <select id="modelSelect" aria-label="Model"></select>
+      <div class="modelPicker" id="modelPicker">
+        <button type="button" id="modelTrigger" class="modelTrigger" aria-haspopup="listbox" aria-expanded="false" title="Select model">
+          <span class="modelTriggerLabel" id="modelTriggerLabel">Select model</span>
+          <span class="modelTriggerCaret" aria-hidden="true">▾</span>
+        </button>
+        <div class="modelPopup hidden" id="modelPopup" role="dialog" aria-label="Select model">
+          <input type="text" id="modelSearch" class="modelSearch" placeholder="Search models…" aria-label="Search models" autocomplete="off" spellcheck="false" />
+          <div class="modelList" id="modelList" role="listbox" aria-label="Models"></div>
+        </div>
+      </div>
       <button type="button" id="addModelBtn" class="iconBtn addModelBtn" title="Add provider" aria-label="Add provider">+</button>
       <div class="modeSelector" role="radiogroup" aria-label="Mode">
         <button type="button" class="modeBtn active" data-mode="plan">Plan</button>

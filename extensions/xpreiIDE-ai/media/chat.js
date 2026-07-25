@@ -9,7 +9,12 @@
   const sendBtn = /** @type {HTMLButtonElement} */ (document.getElementById("sendBtn"));
   const stopBtn = /** @type {HTMLButtonElement} */ (document.getElementById("stopBtn"));
   const resetBtn = /** @type {HTMLButtonElement} */ (document.getElementById("resetBtn"));
-  const modelSelect = /** @type {HTMLSelectElement} */ (document.getElementById("modelSelect"));
+  const modelPicker = /** @type {HTMLElement} */ (document.getElementById("modelPicker"));
+  const modelTrigger = /** @type {HTMLButtonElement} */ (document.getElementById("modelTrigger"));
+  const modelTriggerLabel = /** @type {HTMLElement} */ (document.getElementById("modelTriggerLabel"));
+  const modelPopup = /** @type {HTMLElement} */ (document.getElementById("modelPopup"));
+  const modelSearch = /** @type {HTMLInputElement} */ (document.getElementById("modelSearch"));
+  const modelList = /** @type {HTMLElement} */ (document.getElementById("modelList"));
   const modeBtns = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll(".modeBtn"));
   const gearBtn = /** @type {HTMLButtonElement} */ (document.getElementById("gearBtn"));
   const addModelBtn = /** @type {HTMLButtonElement} */ (document.getElementById("addModelBtn"));
@@ -136,39 +141,163 @@
   }
 
   let lastPointer = "";
+  /** @type {{providerId:string, providerLabel:string, model:string, active?:boolean}[]} */
+  let modelItems = [];
+  let highlightIndex = -1; // index into the currently-rendered .modelOption nodes
 
-  function renderModels(items) {
-    modelSelect.innerHTML = "";
-    if (items.length === 0) {
-      const empty = document.createElement("option");
-      empty.value = "";
-      empty.textContent = "No models — add a provider (⚙ or +)";
-      modelSelect.appendChild(empty);
-      lastPointer = "";
-      return;
+  // Update the composer trigger button to reflect the active model.
+  function refreshTriggerLabel() {
+    const active = modelItems.find((i) => i.providerId + "::" + i.model === lastPointer);
+    if (active) {
+      modelTriggerLabel.textContent = active.model;
+      modelTrigger.title = active.providerLabel + " / " + active.model;
+    } else if (modelItems.length === 0) {
+      modelTriggerLabel.textContent = "No models";
+      modelTrigger.title = "Add a provider (＋)";
+    } else {
+      modelTriggerLabel.textContent = "Select model";
+      modelTrigger.title = "Select model";
     }
-    const groups = new Map();
-    for (const item of items) {
-      let group = groups.get(item.providerLabel);
-      if (!group) {
-        group = document.createElement("optgroup");
-        group.label = item.providerLabel;
-        groups.set(item.providerLabel, group);
-        modelSelect.appendChild(group);
-      }
-      const opt = document.createElement("option");
-      opt.value = item.providerId + "::" + item.model;
-      opt.textContent = item.model;
-      if (item.active) opt.selected = true;
-      group.appendChild(opt);
-    }
-    lastPointer = modelSelect.value;
   }
 
-  modelSelect.addEventListener("change", () => {
-    if (!modelSelect.value) return;
-    lastPointer = modelSelect.value;
-    vscode.postMessage({ type: "selectModel", pointer: modelSelect.value });
+  function renderModels(items) {
+    modelItems = items || [];
+    if (!lastPointer) {
+      const active = modelItems.find((i) => i.active);
+      if (active) lastPointer = active.providerId + "::" + active.model;
+    }
+    refreshTriggerLabel();
+    if (isPopupOpen()) renderModelList(modelSearch.value);
+  }
+
+  // Build the filtered, grouped option list inside the popup.
+  function renderModelList(filter) {
+    modelList.innerHTML = "";
+    highlightIndex = -1;
+    const q = (filter || "").trim().toLowerCase();
+    if (modelItems.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "modelEmpty";
+      empty.textContent = "No models — add a provider (＋)";
+      modelList.appendChild(empty);
+      return;
+    }
+    let lastGroup = "";
+    let shown = 0;
+    for (const item of modelItems) {
+      const pointer = item.providerId + "::" + item.model;
+      if (q && !item.model.toLowerCase().includes(q) && !item.providerLabel.toLowerCase().includes(q)) {
+        continue;
+      }
+      if (item.providerLabel !== lastGroup) {
+        lastGroup = item.providerLabel;
+        const header = document.createElement("div");
+        header.className = "modelGroupHeader";
+        header.textContent = item.providerLabel;
+        modelList.appendChild(header);
+      }
+      const opt = document.createElement("div");
+      opt.className = "modelOption";
+      opt.setAttribute("role", "option");
+      opt.dataset.pointer = pointer;
+      if (pointer === lastPointer) {
+        opt.classList.add("selected");
+        opt.setAttribute("aria-selected", "true");
+      }
+      const check = document.createElement("span");
+      check.className = "modelCheck";
+      check.textContent = pointer === lastPointer ? "✓" : "";
+      const name = document.createElement("span");
+      name.className = "modelName";
+      name.textContent = item.model;
+      opt.appendChild(check);
+      opt.appendChild(name);
+      opt.addEventListener("click", () => selectModel(pointer));
+      opt.addEventListener("mousemove", () => setHighlight(indexOfOption(opt)));
+      modelList.appendChild(opt);
+      shown++;
+    }
+    if (shown === 0) {
+      const none = document.createElement("div");
+      none.className = "modelEmpty";
+      none.textContent = "No matches";
+      modelList.appendChild(none);
+    }
+  }
+
+  function optionNodes() {
+    return /** @type {HTMLElement[]} */ ([...modelList.querySelectorAll(".modelOption")]);
+  }
+  function indexOfOption(node) {
+    return optionNodes().indexOf(node);
+  }
+  function setHighlight(i) {
+    const nodes = optionNodes();
+    highlightIndex = i;
+    nodes.forEach((n, idx) => n.classList.toggle("highlighted", idx === i));
+    if (i >= 0 && nodes[i]) nodes[i].scrollIntoView({ block: "nearest" });
+  }
+  function moveHighlight(delta) {
+    const nodes = optionNodes();
+    if (nodes.length === 0) return;
+    let i = highlightIndex + delta;
+    if (i < 0) i = nodes.length - 1;
+    if (i >= nodes.length) i = 0;
+    setHighlight(i);
+  }
+
+  function selectModel(pointer) {
+    if (!pointer) return;
+    lastPointer = pointer;
+    refreshTriggerLabel();
+    closePopup();
+    vscode.postMessage({ type: "selectModel", pointer });
+  }
+
+  function isPopupOpen() {
+    return !modelPopup.classList.contains("hidden");
+  }
+  function openPopup() {
+    if (modelItems.length === 0) {
+      openSettingsPanel();
+      return;
+    }
+    modelPopup.classList.remove("hidden");
+    modelTrigger.setAttribute("aria-expanded", "true");
+    modelSearch.value = "";
+    renderModelList("");
+    // Highlight the currently-selected option so keyboard nav starts there.
+    const nodes = optionNodes();
+    const sel = nodes.findIndex((n) => n.dataset.pointer === lastPointer);
+    setHighlight(sel >= 0 ? sel : (nodes.length ? 0 : -1));
+    modelSearch.focus();
+  }
+  function closePopup() {
+    modelPopup.classList.add("hidden");
+    modelTrigger.setAttribute("aria-expanded", "false");
+  }
+  function togglePopup() {
+    isPopupOpen() ? closePopup() : openPopup();
+  }
+
+  modelTrigger.addEventListener("click", togglePopup);
+  modelSearch.addEventListener("input", () => renderModelList(modelSearch.value));
+  modelSearch.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); moveHighlight(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); moveHighlight(-1); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      const nodes = optionNodes();
+      if (highlightIndex >= 0 && nodes[highlightIndex]) selectModel(nodes[highlightIndex].dataset.pointer || "");
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closePopup();
+      modelTrigger.focus();
+    }
+  });
+  // Close when focus/click leaves the picker.
+  document.addEventListener("click", (e) => {
+    if (isPopupOpen() && !modelPicker.contains(/** @type {Node} */ (e.target))) closePopup();
   });
 
   function openSettingsPanel() {
