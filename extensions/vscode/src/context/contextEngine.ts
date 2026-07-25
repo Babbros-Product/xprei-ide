@@ -5,12 +5,14 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
+import { getGitApi } from "../git/gitApi";
 import { chunkFile, Chunk } from "@xprei/core";
 import { hasContextRequest, Mentions } from "@xprei/core";
 import {
   buildContextMessage,
   budgetContext,
   FileContext,
+  formatDiff,
   formatFiles,
   formatHits,
   formatProblems,
@@ -144,10 +146,11 @@ export class ContextEngine {
   // to size the context block via budgetContext() instead of blindly
   // concatenating everything the mentions resolved to. Tier priority
   // (highest to lowest): @file: ("break", explicit request) > @problems
-  // ("skip", compact and actionable) > @open ("break", bulkier, ordered
-  // like files) > @codebase hits ("skip", a relevance guess). Every tier
-  // is built unconditionally (even when empty) — budgetContext's return
-  // value is positionally aligned with the input tier array.
+  // ("skip", compact and actionable) > @diff ("break", one segment) >
+  // @open ("break", bulkier, ordered like files) > @codebase hits
+  // ("skip", a relevance guess). Every tier is built unconditionally
+  // (even when empty) — budgetContext's return value is positionally
+  // aligned with the input tier array.
   async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
@@ -167,6 +170,7 @@ export class ContextEngine {
       ? await this.readOpenFiles(new Set(files.map((f) => f.path)))
       : [];
     const problems = mentions.problems ? this.readProblems() : [];
+    const diff = mentions.diff ? await this.readDiff() : "";
 
     const fileTier: SegmentTier = {
       segments: files.map((f) => ({ text: f.content, data: f })),
@@ -175,6 +179,10 @@ export class ContextEngine {
     const problemTier: SegmentTier = {
       segments: problems.map((p) => ({ text: formatProblems([p]), data: p })),
       strategy: "skip",
+    };
+    const diffTier: SegmentTier = {
+      segments: diff ? [{ text: formatDiff(diff), data: null }] : [],
+      strategy: "break",
     };
     const openTier: SegmentTier = {
       segments: openFiles.map((f) => ({ text: f.content, data: f })),
@@ -186,8 +194,8 @@ export class ContextEngine {
       strategy: "skip",
     };
 
-    const [keptFileSegs, keptProblemSegs, keptOpenSegs, keptHitSegs] = budgetContext(
-      [fileTier, problemTier, openTier, hitTier],
+    const [keptFileSegs, keptProblemSegs, keptDiffSegs, keptOpenSegs, keptHitSegs] = budgetContext(
+      [fileTier, problemTier, diffTier, openTier, hitTier],
       contextWindow,
     );
 
@@ -198,6 +206,9 @@ export class ContextEngine {
     // "skip" never truncates a whole diagnostic (each one is its own
     // segment), so seg.data is used raw.
     const budgetedProblems: ProblemInfo[] = keptProblemSegs.map((seg) => seg.data as ProblemInfo);
+    // "break" may have truncated this — always reconstruct from seg.text,
+    // not from the original (untruncated) diff string.
+    const budgetedDiff: string | undefined = keptDiffSegs[0]?.text;
     const budgetedOpenFiles: FileContext[] = keptOpenSegs.map((seg) => ({
       ...(seg.data as FileContext),
       content: seg.text,
@@ -211,6 +222,7 @@ export class ContextEngine {
     return buildContextMessage({
       files: allFiles.length ? formatFiles(allFiles, Number.POSITIVE_INFINITY) : undefined,
       problems: budgetedProblems.length ? formatProblems(budgetedProblems) : undefined,
+      diff: budgetedDiff,
       retrieved: budgetedHits.length ? formatHits(budgetedHits, Number.NEGATIVE_INFINITY) : undefined,
     });
   }
@@ -302,6 +314,18 @@ export class ContextEngine {
       }
     }
     return out;
+  }
+
+  // The current working-tree state vs. the last commit: unstaged plus
+  // staged changes, combined — matches the agent loop's view_diff tool's
+  // `git diff HEAD` semantics. "" if there's no git repo, nothing has
+  // changed, or the vscode.git extension isn't available.
+  private async readDiff(): Promise<string> {
+    const api = await getGitApi();
+    const repo = api?.repositories[0];
+    if (!repo) return "";
+    const [unstaged, staged] = await Promise.all([repo.diff(false), repo.diff(true)]);
+    return [unstaged, staged].filter(Boolean).join("\n");
   }
 
   private resolveRel(p: string): vscode.Uri | undefined {
