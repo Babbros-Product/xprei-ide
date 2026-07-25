@@ -93,7 +93,7 @@ Set an embedding model (**xpreiIDE: Select Embedding Model**, e.g.
 in chat use `@codebase <question>` for semantic retrieval or `@file:src/x.ts` to
 inline a specific file. The index updates as you edit.
 
-Four more mentions need no indexing at all:
+Five more mentions need no indexing at all:
 - **`@open`** — inline every file you currently have open in an editor tab
   (including background tabs you're not looking at right now).
 - **`@problems`** — inline the current error/warning diagnostics for your
@@ -106,6 +106,12 @@ Four more mentions need no indexing at all:
   before it runs — this is the only mention that executes anything.
   **`@terminal:` must be the last thing in your message**: everything
   after the colon, to the end of the text, is treated as the command.
+- **`@url:<address>`** — fetch a public URL and inline its content (HTML
+  pages are stripped down to readable text), e.g.
+  `@url:https://example.com/docs summarize this`. For safety, addresses
+  that resolve to your own machine or local network (localhost, private
+  IP ranges, cloud metadata endpoints) are silently ignored — if `@url:`
+  contributes nothing, that's why.
 
 Combine any of these in one message, e.g. `@diff @problems review my changes`.
 
