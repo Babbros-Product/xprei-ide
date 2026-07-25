@@ -13,6 +13,8 @@ import {
   FileContext,
   formatFiles,
   formatHits,
+  MIN_SCORE,
+  SegmentTier,
 } from "@xprei/core";
 import { VectorStore, SearchHit } from "@xprei/core";
 import { isExcludedPath, SCAN_EXCLUDE } from "@xprei/core";
@@ -137,7 +139,10 @@ export class ContextEngine {
   // Turn parsed mentions into a context message, or "" if nothing to add.
   // contextWindow is the resolved provider's token-count capability — used
   // to size the context block via budgetContext() instead of blindly
-  // concatenating everything the mentions resolved to.
+  // concatenating everything the mentions resolved to. Files are a
+  // higher-priority "break" tier (explicit user request, truncate-and-stop
+  // on overflow); @codebase hits are a lower-priority "skip" tier
+  // (relevance guess, skip oversized hits and keep checking smaller ones).
   async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
@@ -153,11 +158,27 @@ export class ContextEngine {
       }
     }
 
-    const budgeted = budgetContext(files, hits, contextWindow);
+    const fileTier: SegmentTier = {
+      segments: files.map((f) => ({ text: f.content, data: f })),
+      strategy: "break",
+    };
+    const eligibleHits = hits.filter((h) => h.score >= MIN_SCORE);
+    const hitTier: SegmentTier = {
+      segments: eligibleHits.map((h) => ({ text: h.chunk.text, data: h })),
+      strategy: "skip",
+    };
+
+    const [keptFileSegs, keptHitSegs] = budgetContext([fileTier, hitTier], contextWindow);
+
+    const budgetedFiles: FileContext[] = keptFileSegs.map((seg) => ({
+      ...(seg.data as FileContext),
+      content: seg.text,
+    }));
+    const budgetedHits: SearchHit[] = keptHitSegs.map((seg) => seg.data as SearchHit);
 
     return buildContextMessage({
-      files: budgeted.files.length ? formatFiles(budgeted.files, Number.POSITIVE_INFINITY) : undefined,
-      retrieved: budgeted.hits.length ? formatHits(budgeted.hits) : undefined,
+      files: budgetedFiles.length ? formatFiles(budgetedFiles, Number.POSITIVE_INFINITY) : undefined,
+      retrieved: budgetedHits.length ? formatHits(budgetedHits) : undefined,
     });
   }
 
