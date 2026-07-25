@@ -145,3 +145,23 @@ test("@url does not consume a trailing @terminal: mention", () => {
   assert.equal(m.url, "https://example.com/x");
   assert.equal(m.terminalCommand, "npm test");
 });
+
+test("@repomap sets the flag and is stripped from the query", () => {
+  const m = parseMentions("give me an overview @repomap of the project");
+  assert.equal(m.repomap, true);
+  assert.equal(m.cleaned, "give me an overview of the project");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@repomap is false when absent", () => {
+  const m = parseMentions("just a normal question");
+  assert.equal(m.repomap, false);
+});
+
+test("@repomap combines with the other mention types", () => {
+  const m = parseMentions("@repomap @diff @url:https://example.com explain this");
+  assert.equal(m.repomap, true);
+  assert.equal(m.diff, true);
+  assert.equal(m.url, "https://example.com");
+  assert.equal(m.cleaned, "explain this");
+});

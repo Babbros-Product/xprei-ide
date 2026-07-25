@@ -6,6 +6,9 @@
 //   @problems          → inline error/warning diagnostics from open files
 //   @diff              → inline the current staged + unstaged git diff
 //   @url:<address>     → fetch a public URL and inline its content
+//   @repomap           → inline a lightweight per-file symbol map
+//                        (exported/public top-level names) across the
+//                        workspace — TypeScript/JavaScript + Python only
 //   @terminal:<cmd>    → run a shell command (with confirmation) and
 //                        inline its output; must be the LAST thing in
 //                        the message — everything after "@terminal:" to
@@ -19,6 +22,7 @@ export interface Mentions {
   diff: boolean;
   terminalCommand: string | undefined;
   url: string | undefined;
+  repomap: boolean;
   files: string[];
   // Message with mention tokens removed, used as the retrieval query.
   cleaned: string;
@@ -38,6 +42,7 @@ const OPEN_RE = /(^|\s)@open\b/gi;
 const PROBLEMS_RE = /(^|\s)@problems\b/gi;
 const DIFF_RE = /(^|\s)@diff\b/gi;
 const URL_RE = /(^|\s)@url:(\S+)/gi;
+const REPOMAP_RE = /(^|\s)@repomap\b/gi;
 const FILE_RE = /(^|\s)@file:(\S+)/gi;
 // Bare @path shorthand: token containing a slash or a dotted extension.
 const BARE_PATH_RE = /(^|\s)@((?:[\w.\-]+\/)+[\w.\-]+|[\w.\-]+\.[\w]+)/g;
@@ -50,6 +55,7 @@ export function parseMentions(text: string): Mentions {
   let diff = false;
   let terminalCommand: string | undefined;
   let url: string | undefined;
+  let repomap = false;
   let cleaned = text;
 
   cleaned = cleaned.replace(TERMINAL_RE, (_m, pre: string, command: string) => {
@@ -82,6 +88,11 @@ export function parseMentions(text: string): Mentions {
     return pre;
   });
 
+  cleaned = cleaned.replace(REPOMAP_RE, (_m, pre) => {
+    repomap = true;
+    return pre;
+  });
+
   cleaned = cleaned.replace(FILE_RE, (_m, pre: string, path: string) => {
     files.push(path);
     return pre;
@@ -99,6 +110,7 @@ export function parseMentions(text: string): Mentions {
     diff,
     terminalCommand,
     url,
+    repomap,
     files: [...new Set(files)],
     cleaned: cleaned.replace(/\s+/g, " ").trim(),
   };
@@ -112,6 +124,7 @@ export function hasContextRequest(m: Mentions): boolean {
     m.diff ||
     m.terminalCommand !== undefined ||
     m.url !== undefined ||
+    m.repomap ||
     m.files.length > 0
   );
 }

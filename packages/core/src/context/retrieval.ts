@@ -3,6 +3,7 @@
 
 import { SearchHit } from "./vectorstore";
 import { TRUNCATION_MARKER } from "./budget";
+import { FileSymbols } from "./repomap";
 
 export interface FileContext {
   path: string;
@@ -55,6 +56,10 @@ export function formatUrl(url: string, content: string): string {
   return `// URL: ${url}\n${content}`;
 }
 
+export function formatRepoMap(files: FileSymbols[]): string {
+  return files.map((f) => `// ${f.path}: ${f.symbols.join(", ")}`).join("\n");
+}
+
 // Assemble the final context message the chat prepends before the user turn.
 export function buildContextMessage(parts: {
   retrieved?: string;
@@ -63,6 +68,7 @@ export function buildContextMessage(parts: {
   diff?: string;
   terminal?: string;
   url?: string;
+  repomap?: string;
 }): string {
   const sections: string[] = [];
   if (parts.files) sections.push(parts.files);
@@ -70,6 +76,7 @@ export function buildContextMessage(parts: {
   if (parts.diff) sections.push(parts.diff);
   if (parts.terminal) sections.push(parts.terminal);
   if (parts.url) sections.push(parts.url);
+  if (parts.repomap) sections.push(parts.repomap);
   if (parts.retrieved) sections.push("// Relevant code from the workspace:\n" + parts.retrieved);
   if (sections.length === 0) return "";
   return (

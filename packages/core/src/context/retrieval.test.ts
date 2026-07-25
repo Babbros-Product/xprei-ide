@@ -7,10 +7,12 @@ import {
   formatFiles,
   formatHits,
   formatProblems,
+  formatRepoMap,
   formatTerminal,
   formatUrl,
   ProblemInfo,
 } from "./retrieval";
+import { FileSymbols } from "./repomap";
 import { SearchHit } from "./vectorstore";
 
 test("formatFiles renders each file with a FILE header, joined by blank lines", () => {
@@ -178,5 +180,49 @@ test("buildContextMessage with only url present produces just the url section", 
   assert.equal(
     out,
     "The user referenced workspace context. Use it to answer.\n\n// URL: https://example.com\ncontent",
+  );
+});
+
+test("formatRepoMap renders one line per file with path and comma-joined symbols", () => {
+  const files: FileSymbols[] = [
+    { path: "a.ts", symbols: ["foo", "Bar"] },
+    { path: "b.py", symbols: ["baz"] },
+  ];
+  const out = formatRepoMap(files);
+  assert.equal(out, "// a.ts: foo, Bar\n// b.py: baz");
+});
+
+test("formatRepoMap returns an empty string for an empty array", () => {
+  assert.equal(formatRepoMap([]), "");
+});
+
+test("buildContextMessage assembles all eight sections in the locked order", () => {
+  const out = buildContextMessage({
+    files: "// FILE: a.ts\ncontent",
+    problems: "// a.ts:1 (error) bad",
+    diff: "// Current git diff:\nsome diff",
+    terminal: "// $ npm test\nPASS",
+    url: "// URL: https://example.com\ncontent",
+    repomap: "// a.ts: foo, Bar",
+    retrieved: "// a.ts:1-2 (score 0.90)\ncode",
+  });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n" +
+      "// FILE: a.ts\ncontent\n\n" +
+      "// a.ts:1 (error) bad\n\n" +
+      "// Current git diff:\nsome diff\n\n" +
+      "// $ npm test\nPASS\n\n" +
+      "// URL: https://example.com\ncontent\n\n" +
+      "// a.ts: foo, Bar\n\n" +
+      "// Relevant code from the workspace:\n// a.ts:1-2 (score 0.90)\ncode",
+  );
+});
+
+test("buildContextMessage with only repomap present produces just the repomap section", () => {
+  const out = buildContextMessage({ repomap: "// a.ts: foo, Bar" });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n// a.ts: foo, Bar",
   );
 });
