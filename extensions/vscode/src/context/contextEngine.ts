@@ -20,6 +20,7 @@ import { isExcludedPath, SCAN_EXCLUDE } from "@xprei/core";
 const INDEX_FILE = "index.json";
 const EMBED_BATCH = 64;
 const MAX_FILE_BYTES = 200 * 1024;
+const MAX_FILE_CHARS = 8000;
 const RETRIEVE_K = 6;
 
 export class ContextEngine {
@@ -179,7 +180,10 @@ export class ContextEngine {
       if (!uri) continue;
       try {
         const bytes = await vscode.workspace.fs.readFile(uri);
-        out.push({ path: this.rel(uri), content: Buffer.from(bytes).toString("utf8") });
+        const raw = Buffer.from(bytes).toString("utf8");
+        const content =
+          raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) + "\n…(truncated)" : raw;
+        out.push({ path: this.rel(uri), content });
       } catch {
         // ignore unreadable / missing
       }

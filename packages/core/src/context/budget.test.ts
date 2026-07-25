@@ -70,6 +70,17 @@ test("a contextWindow of 0 yields an empty budget for both files and hits", () =
   assert.deepEqual(result, { files: [], hits: [] });
 });
 
+test("a non-finite contextWindow (NaN) produces an empty result, not a garbage truncated entry", () => {
+  // rawBudget = NaN * 4 * 0.5 = NaN; Number.isFinite(NaN) is false, so
+  // totalBudget is clamped to 0 instead of Math.floor(NaN) leaking through
+  // (which would make `remaining <= 0` false, since NaN comparisons are
+  // always false, and push a "".slice(0, NaN) + "\n…(truncated)" entry).
+  const files = [file("a.ts", "x".repeat(20))];
+  const hits = [hit("b.ts", "y".repeat(5), 0.9)];
+  const result = budgetContext(files, hits, NaN);
+  assert.deepEqual(result, { files: [], hits: [] });
+});
+
 test("CHARS_PER_TOKEN and CONTEXT_BLOCK_FRACTION have the spec's exact values", () => {
   assert.equal(CHARS_PER_TOKEN, 4);
   assert.equal(CONTEXT_BLOCK_FRACTION, 0.5);

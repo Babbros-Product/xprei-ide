@@ -49,7 +49,7 @@ by future JetBrains/Eclipse plugins via a shared Node sidecar.
 ```
 packages/core/             # @xprei/core — platform-neutral, no vscode import
   src/providers/           # provider.ts, ollama.ts, openai-compat.ts, presets.ts, modelList.ts
-  src/context/             # chunking, vectorstore, retrieval, mentions, exclude (RAG substrate)
+  src/context/             # chunking, vectorstore, retrieval, mentions, exclude, budget (RAG substrate)
   src/edit/                # prompt.ts (inline-edit prompt builder)
   src/agent/               # protocol, tools, checkpoint, orchestrator, pathResolve, host (interface)
   src/host/nodeHost.ts     # Node AgentHost impl (fs/exec) — the sidecar's file/exec layer
@@ -106,9 +106,9 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
   `glob_search`, `view_diff` agent tools) done; Phase 2a (local Ollama
   auto-discovery on activation) done; Phase 2b (per-role models —
   `completionModel`/`agentModel`/`inlineEditModel`/`commitMessageModel`,
-  each falling back to `activeModel`) done. Remaining phases (3 onward:
-  context-window budgeting, richer context providers, `multi_edit`, shared
-  config, MCP, true FIM, CLI extension) not started.
+  each falling back to `activeModel`) done; Phase 3 (context-window
+  budgeting) done. Remaining phases (4 onward: richer context providers,
+  `multi_edit`, shared config, MCP, true FIM, CLI extension) not started.
 - **Marketplace publish** — not started. Extension is publish-ready
   (`package.json` has publisher/license/icon/categories/keywords,
   `.vscodeignore` and `LICENSE` present, `vscode:prepublish` runs the

@@ -24,7 +24,8 @@ export function budgetContext(
   hits: SearchHit[],
   contextWindow: number,
 ): BudgetedContext {
-  const totalBudget = Math.floor(contextWindow * CHARS_PER_TOKEN * CONTEXT_BLOCK_FRACTION);
+  const rawBudget = contextWindow * CHARS_PER_TOKEN * CONTEXT_BLOCK_FRACTION;
+  const totalBudget = Number.isFinite(rawBudget) ? Math.max(0, Math.floor(rawBudget)) : 0;
   let remaining = totalBudget;
 
   const keptFiles: FileContext[] = [];
