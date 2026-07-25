@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   buildContextMessage,
   FileContext,
+  formatDiff,
   formatFiles,
   formatHits,
   formatProblems,
@@ -80,4 +81,34 @@ test("buildContextMessage assembles files, problems, and retrieved sections in t
 
 test("buildContextMessage returns an empty string when every part is empty", () => {
   assert.equal(buildContextMessage({}), "");
+});
+
+test("formatDiff wraps the diff text with a header comment", () => {
+  const out = formatDiff("diff --git a/x.ts b/x.ts\n+added line");
+  assert.equal(out, "// Current git diff:\ndiff --git a/x.ts b/x.ts\n+added line");
+});
+
+test("buildContextMessage assembles files, problems, diff, and retrieved in that order", () => {
+  const out = buildContextMessage({
+    files: "// FILE: a.ts\ncontent",
+    problems: "// a.ts:1 (error) bad",
+    diff: "// Current git diff:\ndiff --git a/x.ts b/x.ts",
+    retrieved: "// a.ts:1-2 (score 0.90)\ncode",
+  });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n" +
+      "// FILE: a.ts\ncontent\n\n" +
+      "// a.ts:1 (error) bad\n\n" +
+      "// Current git diff:\ndiff --git a/x.ts b/x.ts\n\n" +
+      "// Relevant code from the workspace:\n// a.ts:1-2 (score 0.90)\ncode",
+  );
+});
+
+test("buildContextMessage with only diff present produces just the diff section", () => {
+  const out = buildContextMessage({ diff: "// Current git diff:\nsome diff" });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n// Current git diff:\nsome diff",
+  );
 });

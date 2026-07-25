@@ -60,3 +60,25 @@ test("neither @open nor @problems is set when absent", () => {
   assert.equal(m.open, false);
   assert.equal(m.problems, false);
 });
+
+test("@diff sets the flag and is stripped from the query", () => {
+  const m = parseMentions("what changed @diff exactly");
+  assert.equal(m.diff, true);
+  assert.equal(m.cleaned, "what changed exactly");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@diff combines with @open, @problems, @codebase, and @file:", () => {
+  const m = parseMentions("@diff @open @problems @codebase check @file:a.ts too");
+  assert.equal(m.diff, true);
+  assert.equal(m.open, true);
+  assert.equal(m.problems, true);
+  assert.equal(m.codebase, true);
+  assert.deepEqual(m.files, ["a.ts"]);
+  assert.equal(m.cleaned, "check too");
+});
+
+test("diff flag is false when absent", () => {
+  const m = parseMentions("just a normal question");
+  assert.equal(m.diff, false);
+});
