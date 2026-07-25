@@ -165,3 +165,25 @@ test("agent.revert without a prior run returns an error", async () => {
   await session.handle({ id: 9, method: "agent.revert" });
   assert.ok(emitted.some((m) => m.id === 9 && m.error));
 });
+
+test("agent.run threads protocolRetries and emits agent.protocolError on retry", async () => {
+  const host = new FakeHost();
+  const emitted: any[] = [];
+  const session = new SidecarSession({
+    emit: (m) => emitted.push(m),
+    resolveModel: resolver(new FakeProvider(undefined, ["garbage"])),
+    makeHost: () => host,
+  });
+  await session.handle({
+    id: 3,
+    method: "agent.run",
+    params: { requestId: "a2", model: "p::m", task: "do it", mode: "agent", protocolRetries: 1 },
+  });
+  const protocolErrorEvents = emitted.filter((m) => m.method === "agent.protocolError");
+  assert.equal(protocolErrorEvents.length, 1);
+  assert.deepEqual(
+    [protocolErrorEvents[0].params.attempt, protocolErrorEvents[0].params.maxAttempts],
+    [1, 2],
+  );
+  assert.ok(emitted.some((m) => m.method === "agent.error" && /after 2 attempts/.test(m.params.text)));
+});

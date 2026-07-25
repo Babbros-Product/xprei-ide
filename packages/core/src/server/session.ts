@@ -147,6 +147,8 @@ export class SidecarSession {
     const mode = msg.params?.mode === "edit" ? "edit" : "agent";
     const pointer = String(msg.params?.model ?? "");
     const projectRules = typeof msg.params?.projectRules === "string" ? msg.params.projectRules : undefined;
+    const protocolRetries =
+      typeof msg.params?.protocolRetries === "number" ? msg.params.protocolRetries : undefined;
     const resolved = this.deps.resolveModel(pointer);
     if (!resolved) return this.respondError(msg.id, `unknown model: ${pointer}`);
 
@@ -162,6 +164,8 @@ export class SidecarSession {
       onFinal: (text) => this.emit("agent.final", { requestId, text }),
       onError: (text) => this.emit("agent.error", { requestId, text }),
       onEdit: (path, before, after) => this.emit("agent.edit", { requestId, path, before, after }),
+      onProtocolError: (attempt, maxAttempts, reason) =>
+        this.emit("agent.protocolError", { requestId, attempt, maxAttempts, reason }),
     };
 
     const approver: Approver = {
@@ -177,6 +181,7 @@ export class SidecarSession {
       events,
       tools: mode === "edit" ? EDIT_MODE_TOOLS : TOOLS,
       projectRules,
+      protocolRetries,
     });
     this.lastCheckpoint = agent.checkpoint;
 
