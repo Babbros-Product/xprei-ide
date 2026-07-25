@@ -8,6 +8,7 @@ import {
   formatHits,
   formatProblems,
   formatTerminal,
+  formatUrl,
   ProblemInfo,
 } from "./retrieval";
 import { SearchHit } from "./vectorstore";
@@ -143,5 +144,39 @@ test("buildContextMessage with only terminal present produces just the terminal 
   assert.equal(
     out,
     "The user referenced workspace context. Use it to answer.\n\n// $ npm test\nPASS",
+  );
+});
+
+test("formatUrl wraps the fetched content with the source URL", () => {
+  const out = formatUrl("https://example.com", "Page title\nSome text.");
+  assert.equal(out, "// URL: https://example.com\nPage title\nSome text.");
+});
+
+test("buildContextMessage assembles all six sections in the locked order", () => {
+  const out = buildContextMessage({
+    files: "// FILE: a.ts\ncontent",
+    problems: "// a.ts:1 (error) bad",
+    diff: "// Current git diff:\nsome diff",
+    terminal: "// $ npm test\nPASS",
+    url: "// URL: https://example.com\ncontent",
+    retrieved: "// a.ts:1-2 (score 0.90)\ncode",
+  });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n" +
+      "// FILE: a.ts\ncontent\n\n" +
+      "// a.ts:1 (error) bad\n\n" +
+      "// Current git diff:\nsome diff\n\n" +
+      "// $ npm test\nPASS\n\n" +
+      "// URL: https://example.com\ncontent\n\n" +
+      "// Relevant code from the workspace:\n// a.ts:1-2 (score 0.90)\ncode",
+  );
+});
+
+test("buildContextMessage with only url present produces just the url section", () => {
+  const out = buildContextMessage({ url: "// URL: https://example.com\ncontent" });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n// URL: https://example.com\ncontent",
   );
 });

@@ -5,6 +5,7 @@
 //   @open              → inline every currently-open editor tab
 //   @problems          → inline error/warning diagnostics from open files
 //   @diff              → inline the current staged + unstaged git diff
+//   @url:<address>     → fetch a public URL and inline its content
 //   @terminal:<cmd>    → run a shell command (with confirmation) and
 //                        inline its output; must be the LAST thing in
 //                        the message — everything after "@terminal:" to
@@ -17,6 +18,7 @@ export interface Mentions {
   problems: boolean;
   diff: boolean;
   terminalCommand: string | undefined;
+  url: string | undefined;
   files: string[];
   // Message with mention tokens removed, used as the retrieval query.
   cleaned: string;
@@ -35,6 +37,7 @@ const CODEBASE_RE = /(^|\s)@codebase\b/gi;
 const OPEN_RE = /(^|\s)@open\b/gi;
 const PROBLEMS_RE = /(^|\s)@problems\b/gi;
 const DIFF_RE = /(^|\s)@diff\b/gi;
+const URL_RE = /(^|\s)@url:(\S+)/gi;
 const FILE_RE = /(^|\s)@file:(\S+)/gi;
 // Bare @path shorthand: token containing a slash or a dotted extension.
 const BARE_PATH_RE = /(^|\s)@((?:[\w.\-]+\/)+[\w.\-]+|[\w.\-]+\.[\w]+)/g;
@@ -46,6 +49,7 @@ export function parseMentions(text: string): Mentions {
   let problems = false;
   let diff = false;
   let terminalCommand: string | undefined;
+  let url: string | undefined;
   let cleaned = text;
 
   cleaned = cleaned.replace(TERMINAL_RE, (_m, pre: string, command: string) => {
@@ -73,6 +77,11 @@ export function parseMentions(text: string): Mentions {
     return pre;
   });
 
+  cleaned = cleaned.replace(URL_RE, (_m, pre: string, address: string) => {
+    url = address;
+    return pre;
+  });
+
   cleaned = cleaned.replace(FILE_RE, (_m, pre: string, path: string) => {
     files.push(path);
     return pre;
@@ -89,11 +98,20 @@ export function parseMentions(text: string): Mentions {
     problems,
     diff,
     terminalCommand,
+    url,
     files: [...new Set(files)],
     cleaned: cleaned.replace(/\s+/g, " ").trim(),
   };
 }
 
 export function hasContextRequest(m: Mentions): boolean {
-  return m.codebase || m.open || m.problems || m.diff || m.terminalCommand !== undefined || m.files.length > 0;
+  return (
+    m.codebase ||
+    m.open ||
+    m.problems ||
+    m.diff ||
+    m.terminalCommand !== undefined ||
+    m.url !== undefined ||
+    m.files.length > 0
+  );
 }

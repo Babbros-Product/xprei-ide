@@ -117,3 +117,31 @@ test("@terminal combines with other mention types when they precede it", () => {
   assert.equal(m.terminalCommand, "npm test");
   assert.equal(m.cleaned, "explain");
 });
+
+test("@url:<address> captures the address and is stripped from the query", () => {
+  const m = parseMentions("summarize @url:https://example.com/page please");
+  assert.equal(m.url, "https://example.com/page");
+  assert.equal(m.cleaned, "summarize please");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@url is undefined when absent", () => {
+  const m = parseMentions("just a normal question");
+  assert.equal(m.url, undefined);
+});
+
+test("@url combines with the other mention types", () => {
+  const m = parseMentions("@url:https://example.com @diff @problems check this");
+  assert.equal(m.url, "https://example.com");
+  assert.equal(m.diff, true);
+  assert.equal(m.problems, true);
+  assert.equal(m.cleaned, "check this");
+});
+
+test("@url does not consume a trailing @terminal: mention", () => {
+  // @terminal:'s end-of-string capture runs first and claims everything
+  // after it — @url: must still work when it appears BEFORE @terminal:.
+  const m = parseMentions("@url:https://example.com/x @terminal:npm test");
+  assert.equal(m.url, "https://example.com/x");
+  assert.equal(m.terminalCommand, "npm test");
+});
