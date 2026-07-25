@@ -9,7 +9,8 @@
 //   server → client response: { id, result } | { id, error }
 //   server → client event:    { method, params }   (no id — streaming notification)
 
-import { ChatMessage, Provider } from "../providers/provider";
+import { ChatMessage, isAbortError, Provider } from "../providers/provider";
+import { ModelEntry } from "../providers/modelList";
 import { AgentHost } from "../agent/host";
 import { NodeAgentHost } from "../host/nodeHost";
 import { Agent, AgentEvents, Approver } from "../agent/orchestrator";
@@ -27,6 +28,11 @@ export interface SessionDeps {
   // Resolve a model pointer ("providerId::model") to a live provider + model.
   // The stdio server builds this from the initialize config; tests inject a fake.
   resolveModel: (pointer: string) => ResolvedModel | undefined;
+  // List every available model across all configured providers (the model
+  // picker's data source — mirrors ProviderRegistry.listAllModels() on the VS
+  // Code side, built on the same pure aggregateModels()). Optional so tests
+  // that don't care about the picker can omit it.
+  listModels?: (activePointer: string) => Promise<ModelEntry[]>;
   // Build the agent's file/exec host for a workspace root. Defaults to NodeAgentHost.
   makeHost?: (root: string) => AgentHost;
 }
@@ -55,6 +61,8 @@ export class SidecarSession {
       switch (msg.method) {
         case "initialize":
           return this.onInitialize(msg);
+        case "models.list":
+          return await this.onModelsList(msg);
         case "chat.send":
           return await this.onChatSend(msg);
         case "chat.stop":
@@ -79,8 +87,20 @@ export class SidecarSession {
     const root = msg.params?.workspaceRoot;
     if (typeof root === "string" && root) this.workspaceRoot = root;
     this.respond(msg.id, {
-      capabilities: { chat: true, agent: true, tools: TOOLS.map((t) => t.name) },
+      capabilities: {
+        chat: true,
+        agent: true,
+        tools: TOOLS.map((t) => t.name),
+        modelsList: !!this.deps.listModels,
+      },
     });
+  }
+
+  private async onModelsList(msg: Request): Promise<void> {
+    if (!this.deps.listModels) return this.respond(msg.id, { items: [] });
+    const activePointer = String(msg.params?.activePointer ?? "");
+    const items = await this.deps.listModels(activePointer);
+    this.respond(msg.id, { items });
   }
 
   private async onChatSend(msg: Request): Promise<void> {
@@ -104,7 +124,12 @@ export class SidecarSession {
       }
       this.emit("chat.done", { requestId });
     } catch (err) {
-      this.emit("chat.error", { requestId, message: err instanceof Error ? err.message : String(err) });
+      // A user-initiated Stop (chat.stop aborts the same signal) is not a
+      // failure — end the stream cleanly so the client keeps whatever
+      // streamed as a real turn, same as chatView.ts's onSend does for the
+      // in-process VS Code path.
+      if (isAbortError(err)) this.emit("chat.done", { requestId });
+      else this.emit("chat.error", { requestId, message: err instanceof Error ? err.message : String(err) });
     } finally {
       this.inflightChats.delete(requestId);
     }

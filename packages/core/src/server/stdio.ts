@@ -10,6 +10,7 @@ import * as readline from "node:readline";
 import { Provider, ProviderConfig } from "../providers/provider";
 import { OllamaProvider } from "../providers/ollama";
 import { OpenAICompatProvider } from "../providers/openai-compat";
+import { aggregateModels } from "../providers/modelList";
 import { ResolvedModel, SidecarSession } from "./session";
 
 interface InitProviders {
@@ -36,8 +37,11 @@ export function startStdioServer(): void {
     return { provider: buildProvider(cfg, keys[providerId] ?? ""), model };
   };
 
+  const listModels = (activePointer: string) =>
+    aggregateModels(configs, async (cfg) => buildProvider(cfg, keys[cfg.id] ?? ""), activePointer);
+
   const emit = (msg: unknown) => process.stdout.write(JSON.stringify(msg) + "\n");
-  const session = new SidecarSession({ emit, resolveModel });
+  const session = new SidecarSession({ emit, resolveModel, listModels });
 
   const rl = readline.createInterface({ input: process.stdin });
   rl.on("line", (line) => {

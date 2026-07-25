@@ -70,7 +70,9 @@ extensions/xpreiIDE-ai/    # the VS Code platform layer — imports @xprei/core
 webview/                    # shared chat UI (chat.js/css, icons) — host-agnostic, reused by
                             # future JetBrains/Eclipse plugins. bridge.js is the transport shim:
                             # window.xprei = { postMessage, onMessage }, one contract, three hosts.
-plugins/intellij/          # JetBrains plugin — planned (multi-IDE plan Phase 2)
+plugins/intellij/          # JetBrains plugin (Kotlin/Gradle) — scaffolded, NOT compiled/run yet
+                            # (written with no local JDK/Gradle to verify against — see
+                            # plugins/intellij/README.md before touching this code)
 plugins/eclipse/           # Eclipse plugin — planned (Phase 3)
 docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 ```

@@ -79,17 +79,22 @@ npm run watch          # rebuilds on change
 
 ## JetBrains IDEs
 
-> 🚧 *In development.* One plugin covers all IntelliJ-Platform IDEs (IntelliJ IDEA,
-> PyCharm, WebStorm, GoLand, RubyMine, CLion, Rider, …).
-
-**Install (planned — JetBrains Marketplace):**
-1. In the IDE: **Settings → Plugins → Marketplace**.
-2. Search **xpreiIDE**, click **Install**, restart the IDE.
+> 🚧 *In development — scaffolded, not yet compiled.* The plugin code is
+> written (one plugin covers all IntelliJ-Platform IDEs: IntelliJ IDEA,
+> PyCharm, WebStorm, GoLand, RubyMine, CLion, Rider, …) but has not been built
+> against a real JDK/Gradle yet. See
+> [`plugins/intellij/README.md`](plugins/intellij/README.md) for the full
+> status and what to check first.
 
 **Build from source (current):**
 ```bash
+# one-time: build the shared engine the plugin ships (needs Node.js)
+npm install
+npm run build:sidecar -w @xprei/core
+
 cd plugins/intellij
-./gradlew buildPlugin            # output: build/distributions/xpreiIDE-*.zip
+gradle wrapper --gradle-version 8.10   # generates gradlew (not committed, see plugins/intellij/README.md)
+./gradlew buildPlugin                   # output: build/distributions/xpreiIDE-*.zip
 ```
 Then in the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → select the
 built `.zip` → restart.
@@ -98,8 +103,7 @@ built `.zip` → restart.
 1. Ensure **Node.js ≥ 18** is on your `PATH` (`node --version`).
 2. Open the **xpreiIDE** tool window (right-hand tool-window bar, or
    **View → Tool Windows → xpreiIDE**).
-3. **Settings → Tools → xpreiIDE → Add provider**, or use the **＋** in the chat
-   composer, to configure a model.
+3. Use the **＋** in the chat composer to configure a model provider.
 4. Pick a model in the composer dropdown and start chatting.
 
 **Dev sandbox:**

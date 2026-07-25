@@ -59,7 +59,7 @@ editor, (4) store secrets in the IDE's secure store, (5) persist config.
 
 ## Target repo layout (monorepo)
 
-Current state (Phases 0-1 done):
+Current state (Phases 0-1 done and verified; Phase 2 scaffolded, unverified):
 
 ```
 xprei-ide/                      # repo root (was BABBROSIDE)
@@ -69,17 +69,21 @@ xprei-ide/                      # repo root (was BABBROSIDE)
       src/providers|context|edit|agent/…   # moved from extensions/xpreiIDE-ai/src
       src/host/nodeHost.ts      # Node AgentHost (fs/exec/exclusion-aware grep)
       src/server/session.ts     # transport-agnostic JSON-RPC session
-      src/server/stdio.ts       # line-delimited-JSON sidecar entrypoint
-      src/server/harness.test.ts  # spawns the real stdio process, black-box
+      src/server/stdio.ts       # line-delimited-JSON sidecar entrypoint (dev)
+      src/server/sidecarBundle.test.ts  # builds + proves the distributable .cjs
+      # dist/sidecar.cjs (gitignored) — `npm run build:sidecar`, what plugins ship
   extensions/
     xpreiIDE-ai/                # VS Code extension → consumes @xprei/core
       media/                    # GENERATED copy of webview/, gitignored
       scripts/sync-webview.mjs  # copies webview/ -> media/ pre-compile
   webview/                      # shared chat UI, host-agnostic — chat.js/css,
-                                 # bridge.js (the transport shim), icons
-  plugins/                      # not yet created
-    intellij/                   # Kotlin, Gradle IntelliJ Platform plugin
-    eclipse/                    # Java, PDE/OSGi plugin
+                                 # bridge.js (transport shim), index.html,
+                                 # theme-fallback.css, icons
+  plugins/
+    intellij/                   # Kotlin/Gradle — scaffolded, NOT yet compiled
+                                 # (no local JDK/Gradle to verify against — see
+                                 # plugins/intellij/README.md)
+    eclipse/                    # Java, PDE/OSGi plugin — not started (Phase 3)
   docs/
 ```
 
@@ -158,13 +162,38 @@ Everything else in the webview (rendering, model picker, approvals) is untouched
   run that writes a real file through a real approval round-trip.
 - **84 tests** in `@xprei/core` by the end of this phase (+2 harness).
 
-### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform)
-- ToolWindow hosting a `JBCefBrowser` that loads `webview/`.
-- Launch + supervise the sidecar child process; bridge JCEF ↔ stdio.
-- Native glue: workspace root from `project.basePath`; secrets via **PasswordSafe**;
-  config via `PersistentStateComponent`; apply-edit via `WriteCommandAction` on the
-  `Document`; actions/menus for Select Model / Add Provider / chat toggle.
-- MVP feature set only.
+### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform) — 🚧 scaffolded, **not yet compiled**
+Written on a machine with no local JDK/Gradle (confirmed absent) — everything
+below is code-complete but unverified by an actual build. See
+`plugins/intellij/README.md` for the full caveat, the exact list of
+assumptions made without a compiler, and what to check first.
+
+- `XpreiToolWindowFactory` + `XpreiChatPanel`: ToolWindow (anchored right —
+  JetBrains has no core-patch blocker for that placement, unlike VS Code)
+  hosting a `JBCefBrowser` that loads the shared `webview/index.html`.
+- `XpreiHostBridge`: the translation layer, built from chatView.ts's actual
+  source (not memory) — webview message protocol ↔ sidecar JSON-RPC protocol.
+  Ports `runner.ts`'s `summarize()`/`buildDiffPreview()` for approval cards.
+- `SidecarProcess` + `WebviewResources`: launches the bundled `sidecar.cjs`
+  (extracted from plugin resources to a temp file) via `ProcessBuilder`, and
+  extracts the webview assets the same way for `JBCefBrowser.loadURL()`.
+- `XpreiSettingsState` (`PersistentStateComponent`, app-level) for non-secret
+  provider config; `XpreiSecrets` (`PasswordSafe`) for API keys.
+- `build.gradle.kts` wires `sourceSets.main.resources.srcDir` directly at
+  `../../webview` and `../../packages/core/dist` — no separate copy step,
+  and a `buildSidecar` Gradle `Exec` task runs `npm run build:sidecar` so the
+  bundle is always fresh.
+- **A real, testable gap this pass found and fixed in `packages/core`
+  (not just documented around):** the sidecar had no way to list models
+  across providers at all — added `models.list` to `session.ts`, backed by
+  the existing tested `aggregateModels()`. Also found and fixed: a
+  user-initiated Stop was surfacing as `chat.error` instead of ending
+  cleanly like the VS Code path does — `session.ts`'s `chat.send` now
+  special-cases `isAbortError`, with a test proving it.
+- **MVP-scope simplifications, deliberately not implemented:** cross-restart
+  session persistence (single in-memory session only), `insertAtCursor`/
+  `applyEdit` (no-ops), a revert-last-run command (the sidecar RPC exists and
+  is tested; no menu entry yet). Full list in `plugins/intellij/README.md`.
 
 ### Phase 3 — Eclipse plugin (Java, PDE/OSGi)
 - ViewPart hosting an SWT `Browser` loading `webview/`; `BrowserFunction` bridge.

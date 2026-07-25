@@ -30,6 +30,26 @@ async function tmpWorkspace(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "xprei-harness-"));
 }
 
+test("harness: models.list aggregates real /api/tags results over real stdio", async () => {
+  const ollama = await startFakeOllama([]);
+  const ws = await tmpWorkspace();
+  const proc = spawnFromSource();
+  try {
+    await proc.request("initialize", {
+      workspaceRoot: ws,
+      providers: [{ id: "fake", kind: "ollama", label: "Fake", baseUrl: ollama.url }],
+    });
+    const res = await proc.request("models.list", { activePointer: "fake::fake-model" });
+    assert.deepEqual(res.result.items, [
+      { providerId: "fake", providerLabel: "Fake", model: "fake-model", active: true },
+    ]);
+  } finally {
+    proc.kill();
+    await ollama.close();
+    await fs.rm(ws, { recursive: true, force: true });
+  }
+});
+
 test("harness: chat.send over real stdio streams deltas from a real HTTP backend", async () => {
   const ollama = await startFakeOllama(["Hello from the sidecar!"]);
   const ws = await tmpWorkspace();

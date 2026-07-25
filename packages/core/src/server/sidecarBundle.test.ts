@@ -50,6 +50,26 @@ test("sidecar.cjs is a single self-contained file with no bundled node_modules",
   assert.ok(stat.size > 1000, "bundle should contain real code, not be empty");
 });
 
+test("bundled sidecar: models.list aggregates real /api/tags results", async () => {
+  const ollama = await startFakeOllama([]);
+  const ws = await tmpWorkspace();
+  const proc = new SidecarProcess(process.execPath, [bundlePath], neutralCwd());
+  try {
+    await proc.request("initialize", {
+      workspaceRoot: ws,
+      providers: [{ id: "fake", kind: "ollama", label: "Fake", baseUrl: ollama.url }],
+    });
+    const res = await proc.request("models.list", { activePointer: "fake::fake-model" });
+    assert.deepEqual(res.result.items, [
+      { providerId: "fake", providerLabel: "Fake", model: "fake-model", active: true },
+    ]);
+  } finally {
+    proc.kill();
+    await ollama.close();
+    await fs.rm(ws, { recursive: true, force: true });
+  }
+});
+
 test("bundled sidecar: chat.send over real stdio, spawned with plain node from outside the repo", async () => {
   const ollama = await startFakeOllama(["Hello from the bundle!"]);
   const ws = await tmpWorkspace();
