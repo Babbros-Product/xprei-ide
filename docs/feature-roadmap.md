@@ -33,10 +33,10 @@ not the implementation detail.
    overflows far sooner than a hosted model's. This needs building **before**
    the context-provider phase, not discovered as a bug after.
 2. **Weak local models handle complex tool-call JSON less reliably.**
-   `multiEdit` (multiple find/replace pairs in one call) is more failure-prone
+   `multi_edit` (multiple find/replace pairs in one call) is more failure-prone
    for a small model than our existing single-edit tools. The just-shipped
    protocol-retry feature (`xpreiIDE.agent.protocolRetries`) already
-   mitigates the "invalid JSON envelope" failure class; `multiEdit` is safe
+   mitigates the "invalid JSON envelope" failure class; `multi_edit` is safe
    to build now precisely because that safety net exists.
 
 ## Phases
@@ -44,23 +44,58 @@ not the implementation detail.
 ### Phase 1 — Quick agent-tool wins
 **Scope: small. No dependencies.**
 
-- `.xpreiignore` — user-editable `.gitignore`-syntax file for the RAG
-  indexer, replacing the hardcoded dir list in `packages/core/src/context/
-  exclude.ts`. Fixes an already-logged gap ("Indexer uses an exclude-glob,
-  not true `.gitignore` parsing").
 - `read_file_range` tool — read a line range instead of a whole file.
   Token-efficiency win, most valuable on small-context local models.
 - `glob_search` tool — glob-based file finding, complements `grep`/`list_dir`.
 - `view_diff` tool — surface the current git diff as agent context.
 
-All four are additive entries in `packages/core/src/agent/tools.ts`, each
+All three are additive entries in `packages/core/src/agent/tools.ts`, each
 independently testable the same way existing tools are
-(`packages/core/src/agent/tools.test.ts`).
+(`packages/core/src/agent/tools.test.ts`), each reached through the existing
+`AgentHost` seam so no host-specific work is needed.
+
+### Phase 1b — user-editable ignore file
+**Scope: medium (NOT a quick win — see below). No dependencies.**
+
+A user-editable `.gitignore`-syntax ignore file for the RAG indexer,
+replacing the hardcoded dir list in `packages/core/src/context/exclude.ts`.
+Fixes an already-logged gap in `CLAUDE.md` ("Indexer uses an exclude-glob,
+not true `.gitignore` parsing").
+
+Originally grouped into Phase 1 as a fourth "quick win"; separated after a
+codebase check showed it is materially bigger than the three tool additions
+and shares none of their shape:
+
+- **`SCAN_EXCLUDE` is a single static glob string** (`exclude.ts:21`)
+  consumed directly by `vscode.workspace.findFiles()`
+  (`contextEngine.ts:75,171`). Real `.gitignore` semantics — negation (`!`),
+  anchoring, nested ignore files, precedence — cannot be expressed as one
+  static glob. Either the findFiles fast path is dropped, or the design is
+  a hybrid: coarse glob for the scan, precise per-path filter after.
+- **`exclude.ts` is deliberately pure** (vscode-free, in `@xprei/core`) and
+  has consumers on *both* sides of the seam: `nodeHost.ts:93` (core, for
+  the sidecar's grep) and `contextEngine.ts:129` (VS Code). Reading a file
+  is I/O, which that module currently has none of. The likely shape is a
+  pure parse/match function that takes file *contents*, with each host doing
+  its own read — mirroring how `.xpreiIDErules` is handled today
+  (`extensions/vscode/src/context/projectRules.ts`, VS Code-side I/O only).
+- **Cache invalidation** — the parsed ignore rules need refreshing when the
+  file itself changes, which the current constant-array design never had to
+  consider.
+
+**Open decision — filename.** The shipped project-instructions dotfile is
+`.xpreiIDErules`. A matching `.xpreiIDEignore` keeps that convention;
+`.xpreiignore` (the name used when this was first proposed) breaks it and
+also collides awkwardly on the doubled `i` (`xprei` + `ignore`). Decide
+before implementation — renaming a user-facing dotfile after release is a
+breaking change.
 
 ### Phase 2 — Local-first core UX
-**Scope: medium. No hard dependency on Phase 1, but shares "settings +
-per-host UI" shape with it — sequencing after Phase 1 lets that UI pattern
-mature on a smaller feature first.**
+**Scope: medium. No dependency on Phase 1 or 1b — those are agent-tool and
+indexer work respectively, this is provider/settings work touching a
+different part of the codebase entirely. Sequenced here on priority
+("local LLM support is core"), not on any technical ordering constraint;
+could run before Phase 1 if preferred.**
 
 - **Local model auto-discovery** — on first activation, detect a running
   Ollama daemon at the default port and its installed models, offer
@@ -97,7 +132,7 @@ builder consumed the same way `retrieval.ts`'s existing formatters are —
 model-agnostic, but each must run through Phase 3's budgeting before
 injection.
 
-### Phase 5 — `multiEdit` tool
+### Phase 5 — `multi_edit` tool
 **Scope: small-medium. Depends on Phase 1 for tool-registration conventions
 already established; benefits from the already-shipped protocol-retry
 safety net (see nuance #2 above).**
