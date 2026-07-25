@@ -57,7 +57,7 @@ packages/core/             # @xprei/core — platform-neutral, no vscode import
   src/index.ts             # barrel — the public API the extension imports (NOT server/stdio.ts,
                             # which has a top-level auto-start side effect; import it directly)
   # ALL unit tests live here now (84, run: npm test -w @xprei/core)
-extensions/xpreiIDE-ai/    # the VS Code platform layer — imports @xprei/core
+extensions/vscode/    # the VS Code platform layer — imports @xprei/core
   src/providers/           # registry.ts, addProviderFlow.ts (config/secrets/QuickPick)
   src/context/             # contextEngine.ts, projectRules.ts (vscode.fs/index persistence)
   src/edit/                # inlineEdit.ts (Cmd-K diff decorations)
@@ -67,15 +67,15 @@ extensions/xpreiIDE-ai/    # the VS Code platform layer — imports @xprei/core
   src/ui/chat/             # chat webview host (chatView.ts)
   media/                   # GENERATED copy of webview/ (gitignored) — see scripts/sync-webview.mjs
   scripts/sync-webview.mjs # copies webview/ -> media/, runs as a `compile` pre-step
-webview/                    # shared chat UI (chat.js/css, icons) — host-agnostic, reused by
-                            # future JetBrains/Eclipse plugins. bridge.js is the transport shim:
-                            # window.xprei = { postMessage, onMessage }, one contract, three hosts.
-plugins/intellij/          # JetBrains plugin (Kotlin/Gradle) — scaffolded, NOT compiled/run yet
+extensions/intellij/       # JetBrains plugin (Kotlin/Gradle) — scaffolded, NOT compiled/run yet
                             # (written with no local JDK/Gradle to verify against — see
-                            # plugins/intellij/README.md before touching this code)
-plugins/eclipse/           # Eclipse plugin (Java/Tycho) — scaffolded, NOT compiled/run yet
+                            # extensions/intellij/README.md before touching this code)
+extensions/eclipse/        # Eclipse plugin (Java/Tycho) — scaffolded, NOT compiled/run yet
                             # (written with no local Maven to verify against — see
-                            # plugins/eclipse/README.md before touching this code)
+                            # extensions/eclipse/README.md before touching this code)
+webview/                    # shared chat UI (chat.js/css, icons) — host-agnostic, reused by
+                            # the intellij/eclipse plugins. bridge.js is the transport shim:
+                            # window.xprei = { postMessage, onMessage }, one contract, three hosts.
 docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 ```
 
@@ -128,7 +128,7 @@ coupled/UI layer is verified by typecheck + compile + manual smoke).
 separate core build step. It's an extension **devDependency** (bundled by esbuild
 at compile time, not a runtime dep).
 
-Package a local `.vsix`: from `extensions/xpreiIDE-ai`,
+Package a local `.vsix`: from `extensions/vscode`,
 `npx @vscode/vsce package --no-dependencies`. The `--no-dependencies` flag is
 **required** in this workspace — without it vsce follows the `@xprei/core`
 symlink and tries to package the whole repo. Safe because esbuild has already

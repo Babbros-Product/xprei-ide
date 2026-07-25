@@ -1,4 +1,3 @@
-// extensions/xpreiIDE-ai/src/providers/addProviderFlow.ts
 // QuickPick/InputBox wizard for adding a provider without hand-editing JSON.
 // Shared by the "xpreiIDE.addProvider" command and the chat panel's
 // "+ Add provider…" picker entry — one implementation, two entry points.

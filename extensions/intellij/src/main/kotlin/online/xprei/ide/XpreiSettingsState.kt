@@ -8,7 +8,7 @@ import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
 
 // Non-secret provider config (id/kind/label/baseUrl/model) mirrors VS Code's
-// xpreiIDE.providers setting shape 1:1 — see extensions/xpreiIDE-ai's
+// xpreiIDE.providers setting shape 1:1 — see extensions/vscode's
 // ProviderConfig (@xprei/core). API keys are NEVER stored here; see
 // XpreiSecrets (PasswordSafe).
 data class ProviderConfigState(

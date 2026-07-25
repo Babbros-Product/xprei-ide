@@ -5,7 +5,7 @@ Company: **Babbros** · Product site: **xprei.online** · Support: **support@xpr
 
 ## Context
 
-xpreiIDE today is a single VS Code extension (TypeScript, `extensions/xpreiIDE-ai/`):
+xpreiIDE today is a single VS Code extension (TypeScript, `extensions/vscode/`):
 a bring-your-own-model AI assistant — streaming chat, @codebase RAG, Cmd-K inline
 edit, an agentic multi-file loop, ghost-text completions, and commit-message
 generation, all driven by user-supplied models (local Ollama or any
@@ -66,26 +66,25 @@ xprei-ide/                      # repo root (was BABBROSIDE)
   package.json                  # npm workspaces: packages/*, extensions/*
   packages/
     core/                       # @xprei/core — the 16 pure modules, no vscode
-      src/providers|context|edit|agent/…   # moved from extensions/xpreiIDE-ai/src
+      src/providers|context|edit|agent/…   # moved from extensions/vscode/src
       src/host/nodeHost.ts      # Node AgentHost (fs/exec/exclusion-aware grep)
       src/server/session.ts     # transport-agnostic JSON-RPC session
       src/server/stdio.ts       # line-delimited-JSON sidecar entrypoint (dev)
       src/server/sidecarBundle.test.ts  # builds + proves the distributable .cjs
       # dist/sidecar.cjs (gitignored) — `npm run build:sidecar`, what plugins ship
   extensions/
-    xpreiIDE-ai/                # VS Code extension → consumes @xprei/core
+    vscode/                     # VS Code extension (package name "xpreiIDE-ai") → consumes @xprei/core
       media/                    # GENERATED copy of webview/, gitignored
       scripts/sync-webview.mjs  # copies webview/ -> media/ pre-compile
+    intellij/                   # Kotlin/Gradle — scaffolded, NOT yet compiled
+                                 # (no local JDK/Gradle to verify against — see
+                                 # extensions/intellij/README.md)
+    eclipse/                    # Java/Tycho — scaffolded, NOT yet compiled
+                                 # (no local Maven to verify against — see
+                                 # extensions/eclipse/README.md)
   webview/                      # shared chat UI, host-agnostic — chat.js/css,
                                  # bridge.js (transport shim), index.html,
                                  # theme-fallback.css, icons
-  plugins/
-    intellij/                   # Kotlin/Gradle — scaffolded, NOT yet compiled
-                                 # (no local JDK/Gradle to verify against — see
-                                 # plugins/intellij/README.md)
-    eclipse/                    # Java/Tycho — scaffolded, NOT yet compiled
-                                 # (no local Maven to verify against — see
-                                 # plugins/eclipse/README.md)
   docs/
 ```
 
@@ -128,7 +127,7 @@ Everything else in the webview (rendering, model picker, approvals) is untouched
 ### Phase 0 — Extract & validate the core (de-risks everything) — ✅ done
 - `packages/core` created; the 16 pure modules moved in unchanged, exported via
   `src/index.ts`. npm-workspaces monorepo (root `package.json`).
-- `extensions/xpreiIDE-ai` refactored to import from `@xprei/core`. **Success
+- `extensions/vscode` refactored to import from `@xprei/core`. **Success
   gate met:** tsc clean, esbuild bundle unchanged in size, `vsce package
   --no-dependencies` produces a clean vsix, reinstalled and smoke-tested.
 - `src/host/nodeHost.ts` (Node `AgentHost`: fs/exec/exclusion-aware grep) added,
@@ -142,7 +141,7 @@ Everything else in the webview (rendering, model picker, approvals) is untouched
 ### Phase 1 — Shared webview + sidecar as a standalone product — ✅ done
 - `media/chat.*` moved to root-level `webview/` (host-agnostic source of truth).
   The VS Code extension's `media/` is now a **generated copy**, synced from
-  `webview/` by `extensions/xpreiIDE-ai/scripts/sync-webview.mjs` as a
+  `webview/` by `extensions/vscode/scripts/sync-webview.mjs` as a
   `compile`-script pre-step (gitignored) — vsce refuses to package files it
   reaches via a path outside the extension root, so a physical copy is
   required, not a symlink.
@@ -167,7 +166,7 @@ Everything else in the webview (rendering, model picker, approvals) is untouched
 ### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform) — 🚧 scaffolded, **not yet compiled**
 Written on a machine with no local JDK/Gradle (confirmed absent) — everything
 below is code-complete but unverified by an actual build. See
-`plugins/intellij/README.md` for the full caveat, the exact list of
+`extensions/intellij/README.md` for the full caveat, the exact list of
 assumptions made without a compiler, and what to check first.
 
 - `XpreiToolWindowFactory` + `XpreiChatPanel`: ToolWindow (anchored right —
@@ -195,11 +194,11 @@ assumptions made without a compiler, and what to check first.
 - **MVP-scope simplifications, deliberately not implemented:** cross-restart
   session persistence (single in-memory session only), `insertAtCursor`/
   `applyEdit` (no-ops), a revert-last-run command (the sidecar RPC exists and
-  is tested; no menu entry yet). Full list in `plugins/intellij/README.md`.
+  is tested; no menu entry yet). Full list in `extensions/intellij/README.md`.
 
 ### Phase 3 — Eclipse plugin (Java, Tycho/OSGi) — 🚧 scaffolded, **not yet compiled**
 Written on the same machine, confirmed to also have no local Maven — same
-caveat as Phase 2. See `plugins/eclipse/README.md` for the full status and
+caveat as Phase 2. See `extensions/eclipse/README.md` for the full status and
 what to check first (target-platform resolution and Tycho version drift are
 the two biggest risk areas — historically more finicky than Gradle).
 

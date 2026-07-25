@@ -2,7 +2,7 @@
 
 ## ⚠️ Status: written, NOT compiled or run
 
-Same situation as `plugins/intellij`: this was scaffolded on a machine with
+Same situation as `extensions/intellij`: this was scaffolded on a machine with
 **no JDK, no Maven** installed (confirmed: `java`, `javac`, `mvn` all absent
 from PATH). Eclipse/Tycho builds are historically more finicky than Gradle
 (target-platform resolution, P2 repository availability, Tycho version
@@ -12,7 +12,7 @@ grounded via documentation search, not compiled, not run.
 ### What to do first
 
 ```bash
-# from plugins/eclipse, with a JDK 17+ and Maven 3.9+ on PATH:
+# from extensions/eclipse, with a JDK 17+ and Maven 3.9+ on PATH:
 mvn -f online.xprei.ide.eclipse/pom.xml -N validate   # sanity-check the poms parse before a full build
 mvn clean verify                                       # full Tycho build — resolves the target platform,
                                                          # compiles, packages
@@ -80,7 +80,7 @@ actually sends and receives.
 
 ## Architecture
 
-Mirrors the IntelliJ plugin (see `plugins/intellij/README.md` for the shared
+Mirrors the IntelliJ plugin (see `extensions/intellij/README.md` for the shared
 background) with Eclipse's own platform APIs:
 
 - **`XpreiChatView`** (`ViewPart`) hosts an SWT `Browser` loading the same

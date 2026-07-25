@@ -56,7 +56,7 @@ code --install-extension xpreiIDE-ai-0.0.1.vsix
 
 **Or build it yourself:**
 ```bash
-cd extensions/xpreiIDE-ai
+cd extensions/vscode
 npm install
 npm run compile
 npx @vscode/vsce package        # produces xpreiIDE-ai-<version>.vsix
@@ -70,7 +70,7 @@ npx @vscode/vsce package        # produces xpreiIDE-ai-<version>.vsix
 
 **Developer loop (live reload):**
 ```bash
-cd extensions/xpreiIDE-ai
+cd extensions/vscode
 npm run watch          # rebuilds on change
 # press F5 in VS Code → Extension Development Host
 ```
@@ -83,7 +83,7 @@ npm run watch          # rebuilds on change
 > written (one plugin covers all IntelliJ-Platform IDEs: IntelliJ IDEA,
 > PyCharm, WebStorm, GoLand, RubyMine, CLion, Rider, …) but has not been built
 > against a real JDK/Gradle yet. See
-> [`plugins/intellij/README.md`](plugins/intellij/README.md) for the full
+> [`extensions/intellij/README.md`](extensions/intellij/README.md) for the full
 > status and what to check first.
 
 **Build from source (current):**
@@ -92,8 +92,8 @@ npm run watch          # rebuilds on change
 npm install
 npm run build:sidecar -w @xprei/core
 
-cd plugins/intellij
-gradle wrapper --gradle-version 8.10   # generates gradlew (not committed, see plugins/intellij/README.md)
+cd extensions/intellij
+gradle wrapper --gradle-version 8.10   # generates gradlew (not committed, see extensions/intellij/README.md)
 ./gradlew buildPlugin                   # output: build/distributions/xpreiIDE-*.zip
 ```
 Then in the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → select the
@@ -108,7 +108,7 @@ built `.zip` → restart.
 
 **Dev sandbox:**
 ```bash
-cd plugins/intellij
+cd extensions/intellij
 ./gradlew runIde                 # launches a sandbox IDE with the plugin loaded
 ```
 
@@ -119,7 +119,7 @@ cd plugins/intellij
 > 🚧 *In development — scaffolded, not yet compiled.* Same status as the
 > JetBrains plugin: the code is written but has not been built against a real
 > Maven/Tycho toolchain yet. See
-> [`plugins/eclipse/README.md`](plugins/eclipse/README.md) for the full
+> [`extensions/eclipse/README.md`](extensions/eclipse/README.md) for the full
 > status and what to check first.
 
 **Build from source (current):**
@@ -128,7 +128,7 @@ cd plugins/intellij
 npm install
 npm run build:sidecar -w @xprei/core
 
-cd plugins/eclipse
+cd extensions/eclipse
 mvn clean package                # Tycho build → target/*.zip (needs JDK 17+, Maven 3.9+)
 ```
 Unzip the built module's `target/*.zip` into your Eclipse `dropins/` folder and
@@ -141,7 +141,7 @@ restart Eclipse.
 4. Pick a model and start chatting.
 
 **Dev workbench:**
-Import `plugins/eclipse` as an Eclipse plugin project (or open it via
+Import `extensions/eclipse` as an Eclipse plugin project (or open it via
 `mvn eclipse:eclipse` / m2e) and launch an **Eclipse Application** run
 configuration (runtime workbench).
 
@@ -185,9 +185,9 @@ configuration (runtime workbench).
 ## Repository layout
 
 ```
-extensions/xpreiIDE-ai/     # VS Code extension (available today)
-plugins/intellij/           # JetBrains plugin (in development)
-plugins/eclipse/            # Eclipse plugin (in development)
+extensions/vscode/          # VS Code extension (package name "xpreiIDE-ai", available today)
+extensions/intellij/        # JetBrains plugin (in development)
+extensions/eclipse/         # Eclipse plugin (in development)
 packages/core/              # shared bring-your-own-model + agent core (in development)
 webview/                    # shared chat UI (in development)
 docs/                       # design specs and the multi-IDE plan
@@ -200,4 +200,4 @@ docs/                       # design specs and the multi-IDE plan
 - **Company:** Babbros
 - **Website:** [xprei.online](https://xprei.online)
 - **Support:** support@xprei.com
-- **License:** MIT (see [`extensions/xpreiIDE-ai/LICENSE`](extensions/xpreiIDE-ai/LICENSE))
+- **License:** MIT (see [`extensions/vscode/LICENSE`](extensions/vscode/LICENSE))

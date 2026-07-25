@@ -26,7 +26,7 @@ import static online.xprei.ide.eclipse.MiniJson.obj;
 
 /**
  * Translates between the webview's message protocol — identical to VS
- * Code's {@code extensions/xpreiIDE-ai/src/ui/chat/chatView.ts}, verified
+ * Code's {@code extensions/vscode/src/ui/chat/chatView.ts}, verified
  * against that file's actual source this session, not reconstructed from
  * memory — and the sidecar's JSON-RPC protocol
  * ({@code packages/core/src/server/session.ts}). This is the Eclipse/Java +
@@ -36,7 +36,7 @@ import static online.xprei.ide.eclipse.MiniJson.obj;
  * {@code @xprei/core} (TypeScript).
  *
  * <p>Same MVP-scope simplifications as the IntelliJ plugin (see
- * {@code plugins/eclipse/README.md} and this class's IntelliJ counterpart's
+ * {@code extensions/eclipse/README.md} and this class's IntelliJ counterpart's
  * header comment for the full list): single in-memory chat session,
  * insertAtCursor/applyEdit are no-ops, no revert-last-run command wired to a
  * menu yet (the sidecar RPC exists and is tested), agent file edits trigger
@@ -441,7 +441,7 @@ public final class XpreiHostBridge {
         sidecar.send(MiniJson.stringify(obj("method", method, "params", params)));
     }
 
-    // ---- Ported 1:1 from extensions/xpreiIDE-ai/src/agent/runner.ts's
+    // ---- Ported 1:1 from extensions/vscode/src/agent/runner.ts's
     // summarize()/buildDiffPreview() (also ported to the IntelliJ plugin's
     // XpreiHostBridge.kt) — kept in sync manually. ----
 

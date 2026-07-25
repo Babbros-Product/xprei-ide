@@ -1,5 +1,5 @@
 // xpreiIDE — JetBrains plugin. UNVERIFIED: written without a local JDK/Gradle
-// to compile against (see plugins/intellij/README.md for the full caveat and
+// to compile against (see extensions/intellij/README.md for the full caveat and
 // what to check first). Grounded against the IntelliJ Platform Gradle Plugin
 // 2.x docs (https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
 // at the time of writing, not verified by an actual build.
@@ -43,7 +43,7 @@ intellijPlatform {
     }
 }
 
-// The repo root, two levels up from plugins/intellij.
+// The repo root, two levels up from extensions/intellij.
 val repoRoot = rootDir.parentFile.parentFile
 val webviewDir = File(repoRoot, "webview")
 val coreDir = File(repoRoot, "packages/core")

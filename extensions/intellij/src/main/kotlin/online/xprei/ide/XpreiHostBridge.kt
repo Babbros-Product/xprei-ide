@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 // Translates between the webview's message protocol — IDENTICAL to VS Code's
-// extensions/xpreiIDE-ai/src/ui/chat/chatView.ts, verified against that file's
+// extensions/vscode/src/ui/chat/chatView.ts, verified against that file's
 // actual .post()/onDidReceiveMessage source, not reconstructed from memory —
 // and the sidecar's JSON-RPC protocol (packages/core/src/server/session.ts).
 // This class is the JetBrains equivalent of chatView.ts + agent/runner.ts
@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 //
 // MVP scope only (per docs/multi-ide-plan.md): chat + BYO-model + agent loop
 // with approvals/revert-adjacent VFS refresh. Deliberately simplified vs the
-// VS Code extension, flagged inline below and in plugins/intellij/README.md:
+// VS Code extension, flagged inline below and in extensions/intellij/README.md:
 //   - Single in-memory chat session (no cross-restart persistence, no
 //     multi-session history panel — "newChat"/"switchSession" are minimal).
 //   - insertAtCursor / applyEdit (chat code-block actions) are no-ops.
@@ -421,7 +421,7 @@ class XpreiHostBridge(private val project: Project, private val postToWebview: (
     }
 
     companion object {
-        // Ported 1:1 from extensions/xpreiIDE-ai/src/agent/runner.ts's
+        // Ported 1:1 from extensions/vscode/src/agent/runner.ts's
         // summarize() / buildDiffPreview() — kept in sync manually since
         // there's no shared module between the TS core and this Kotlin plugin
         // (the sidecar protocol only carries {tool, args}, not a pre-rendered

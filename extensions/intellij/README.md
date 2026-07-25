@@ -13,7 +13,7 @@ not working code, until that happens.
 ### What to do first
 
 ```bash
-# from plugins/intellij, with a JDK 17+ on PATH:
+# from extensions/intellij, with a JDK 17+ on PATH:
 gradle wrapper --gradle-version 8.10   # generates gradlew/gradlew.bat (not committed — see below)
 ./gradlew build                         # compiles Kotlin, catches real errors
 ./gradlew runIde                        # launches a sandbox IDE with the plugin loaded
@@ -50,7 +50,7 @@ VS Code extension and the future Eclipse plugin use, inside a `JBCefBrowser`.
 `XpreiHostBridge` is the translation layer between two protocols:
 
 - **Webview ↔ host**: the exact message shapes
-  `extensions/xpreiIDE-ai/src/ui/chat/chatView.ts` speaks (`{type:"send",...}`,
+  `extensions/vscode/src/ui/chat/chatView.ts` speaks (`{type:"send",...}`,
   `{type:"agent",kind:"..."}`, etc.) — verified against that file's actual
   source this session, not reconstructed from memory.
 - **Host ↔ sidecar**: the JSON-RPC protocol in `packages/core/src/server/

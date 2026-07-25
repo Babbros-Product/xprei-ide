@@ -1,4 +1,3 @@
-// extensions/xpreiIDE-ai/src/providers/modelList.ts
 // Pure aggregation logic for the model picker: given configured providers and
 // a way to build each one, resolve every available model name. Kept vscode-free
 // so it's directly unit-testable; ProviderRegistry.listAllModels() is the thin

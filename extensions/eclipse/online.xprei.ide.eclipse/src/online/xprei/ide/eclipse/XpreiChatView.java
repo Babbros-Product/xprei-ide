@@ -83,7 +83,7 @@ public final class XpreiChatView extends ViewPart {
         // unlike VS Code's single workspace folder or JetBrains' project.basePath.
         // Use the first open project's location if one exists, else fall back to
         // the workspace root directory itself. Multi-project workspaces aren't
-        // fully modeled yet — see plugins/eclipse/README.md.
+        // fully modeled yet — see extensions/eclipse/README.md.
         IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
         for (IProject project : root.getProjects()) {
             if (project.isOpen()) {
