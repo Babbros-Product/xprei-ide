@@ -1,7 +1,7 @@
 // @ts-check
 // Webview UI script. Renders messages and streams assistant deltas.
 (function () {
-  const vscode = acquireVsCodeApi();
+  const vscode = window.xprei; // host transport shim — see bridge.js
 
   const messagesEl = /** @type {HTMLElement} */ (document.getElementById("messages"));
   const form = /** @type {HTMLFormElement} */ (document.getElementById("composer"));
@@ -489,8 +489,7 @@
     vscode.postMessage({ type: "reset" });
   });
 
-  window.addEventListener("message", (event) => {
-    const msg = event.data;
+  vscode.onMessage((msg) => {
     switch (msg.type) {
       case "restore": {
         const restored = addMessage(msg.role, msg.text, msg.role === "assistant");

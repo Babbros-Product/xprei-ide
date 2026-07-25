@@ -4,3 +4,6 @@ out/
 *.vsix
 *.log
 .DS_Store
+
+# generated copy of webview/ synced in at compile time (see scripts/sync-webview.mjs)
+extensions/xpreiIDE-ai/media/

@@ -232,7 +232,7 @@
     }
   },
   "scripts": {
-    "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "compile": "node scripts/sync-webview.mjs && esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "npm run compile -- --sourcemap --watch",
     "vscode:prepublish": "npm run compile -- --minify",
     "typecheck": "tsc --noEmit"

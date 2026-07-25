@@ -59,19 +59,27 @@ editor, (4) store secrets in the IDE's secure store, (5) persist config.
 
 ## Target repo layout (monorepo)
 
+Current state (Phases 0-1 done):
+
 ```
 xprei-ide/                      # repo root (was BABBROSIDE)
+  package.json                  # npm workspaces: packages/*, extensions/*
   packages/
     core/                       # @xprei/core — the 16 pure modules, no vscode
-      src/ …                    # moved verbatim from extensions/xpreiIDE-ai/src
-      src/server.ts             # NEW: JSON-RPC-over-stdio sidecar entrypoint
-      src/host/nodeHost.ts      # NEW: Node AgentHost (fs/exec/grep) for the sidecar
+      src/providers|context|edit|agent/…   # moved from extensions/xpreiIDE-ai/src
+      src/host/nodeHost.ts      # Node AgentHost (fs/exec/exclusion-aware grep)
+      src/server/session.ts     # transport-agnostic JSON-RPC session
+      src/server/stdio.ts       # line-delimited-JSON sidecar entrypoint
+      src/server/harness.test.ts  # spawns the real stdio process, black-box
   extensions/
-    xpreiIDE-ai/                # existing VS Code extension → consumes @xprei/core
-  plugins/
+    xpreiIDE-ai/                # VS Code extension → consumes @xprei/core
+      media/                    # GENERATED copy of webview/, gitignored
+      scripts/sync-webview.mjs  # copies webview/ -> media/ pre-compile
+  webview/                      # shared chat UI, host-agnostic — chat.js/css,
+                                 # bridge.js (the transport shim), icons
+  plugins/                      # not yet created
     intellij/                   # Kotlin, Gradle IntelliJ Platform plugin
     eclipse/                    # Java, PDE/OSGi plugin
-  webview/                      # shared chat UI (moved from media/), host-agnostic
   docs/
 ```
 
@@ -96,36 +104,59 @@ One long-lived process per IDE window. Requests / streaming notifications:
 The existing `agent/orchestrator.ts` `Approver` + event interfaces map directly
 onto these notifications — no redesign of the agent loop.
 
-## Shared webview transport shim
+## Shared webview transport shim — ✅ built (Phase 1)
 
-`media/chat.js` today calls `acquireVsCodeApi().postMessage`. Extract a tiny
-`bridge` module with `postMessage(msg)` + `onMessage(cb)`; provide three
-implementations selected at load time:
+`webview/bridge.js`: `window.xprei = { postMessage(msg), onMessage(cb) }`.
 
 - **VS Code:** `acquireVsCodeApi()` (unchanged behavior).
-- **JetBrains/JCEF:** an injected JS object + `window.cefQuery` (or
-  `JBCefJSQuery`) round-trip.
-- **Eclipse/SWT:** `BrowserFunction` (Java→JS via `browser.execute`, JS→Java via a
-  registered function).
+- **JetBrains (JCEF) and Eclipse (SWT) share one native contract**, not two
+  bespoke ones: a plugin injects `window.xpreiHostBridge.postMessage(jsonString)`
+  (via `JBCefJSQuery.inject()` for JetBrains, a registered `BrowserFunction` for
+  Eclipse) and pushes inbound messages by calling a global
+  `window.__xpreiReceive(jsonStringOrObject)` from native code.
 
-Everything else in the webview (rendering, model picker, approvals) stays identical.
+Everything else in the webview (rendering, model picker, approvals) is untouched.
 
 ## Phased implementation
 
-### Phase 0 — Extract & validate the core (de-risks everything)
-- Create `packages/core`; move the 16 pure modules in unchanged. Publish as
-  `@xprei/core` (workspace package). Keep the existing 71 tests green there.
-- Refactor `extensions/xpreiIDE-ai` to import from `@xprei/core`. **Success gate:
-  the VS Code extension behaves identically and all tests pass** — proof the core
-  is cleanly extractable.
-- Add `src/host/nodeHost.ts` (a Node `AgentHost`: `fs`, `child_process`, a grep)
-  and `src/server.ts` (the JSON-RPC sidecar) with headless tests.
+### Phase 0 — Extract & validate the core (de-risks everything) — ✅ done
+- `packages/core` created; the 16 pure modules moved in unchanged, exported via
+  `src/index.ts`. npm-workspaces monorepo (root `package.json`).
+- `extensions/xpreiIDE-ai` refactored to import from `@xprei/core`. **Success
+  gate met:** tsc clean, esbuild bundle unchanged in size, `vsce package
+  --no-dependencies` produces a clean vsix, reinstalled and smoke-tested.
+- `src/host/nodeHost.ts` (Node `AgentHost`: fs/exec/exclusion-aware grep) added,
+  with its own tests run against a real temp dir.
+- `src/server/session.ts` (transport-agnostic JSON-RPC session: chat streaming +
+  the full agent loop with approval round-trips) + `src/server/stdio.ts` (the
+  line-delimited-JSON entrypoint) added.
+- **82 tests** in `@xprei/core` by the end of this phase (71 moved + 7 NodeHost
+  + 4 session).
 
-### Phase 1 — Shared webview + sidecar as a standalone product
-- Move `media/chat.*` to `webview/`; add the transport shim; keep VS Code working
-  through it.
-- Wire the sidecar end-to-end: a CLI harness that runs a chat + an agent task
-  against a temp workspace, proving MVP works with no IDE at all.
+### Phase 1 — Shared webview + sidecar as a standalone product — ✅ done
+- `media/chat.*` moved to root-level `webview/` (host-agnostic source of truth).
+  The VS Code extension's `media/` is now a **generated copy**, synced from
+  `webview/` by `extensions/xpreiIDE-ai/scripts/sync-webview.mjs` as a
+  `compile`-script pre-step (gitignored) — vsce refuses to package files it
+  reaches via a path outside the extension root, so a physical copy is
+  required, not a symlink.
+- `webview/bridge.js` — the transport shim. Contract: `window.xprei =
+  { postMessage(msg), onMessage(cb) }`. VS Code uses `acquireVsCodeApi()`
+  unchanged; JetBrains and Eclipse share ONE native contract instead of two
+  bespoke ones — a plugin injects `window.xpreiHostBridge.postMessage(json)`
+  and pushes inbound messages via a global `window.__xpreiReceive(json)`.
+  `chat.js` itself only changed two lines (`acquireVsCodeApi()` →
+  `window.xprei`, the inbound `window.addEventListener("message", …)` →
+  `vscode.onMessage(cb)`) — everything else (rendering, model picker,
+  approvals) is untouched.
+- `src/server/harness.test.ts` — the Phase 1 gate. Spawns the **real**
+  `node --import tsx src/server/stdio.ts` child process (not an in-process
+  call — the exact thing a JetBrains/Eclipse plugin will do), drives it over
+  real stdin/stdout with real line-delimited JSON, against a throwaway local
+  HTTP server speaking the Ollama wire format (fully offline/deterministic) and
+  a real temp workspace dir. Proves: chat streaming end-to-end, and an agent
+  run that writes a real file through a real approval round-trip.
+- **84 tests** in `@xprei/core` by the end of this phase (+2 harness).
 
 ### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform)
 - ToolWindow hosting a `JBCefBrowser` that loads `webview/`.

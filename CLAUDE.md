@@ -52,8 +52,11 @@ packages/core/             # @xprei/core — platform-neutral, no vscode import
   src/context/             # chunking, vectorstore, retrieval, mentions, exclude (RAG substrate)
   src/edit/                # prompt.ts (inline-edit prompt builder)
   src/agent/               # protocol, tools, checkpoint, orchestrator, pathResolve, host (interface)
-  src/index.ts             # barrel — the public API the extension imports
-  # ALL unit tests live here now (71, run: npm test -w @xprei/core)
+  src/host/nodeHost.ts     # Node AgentHost impl (fs/exec) — the sidecar's file/exec layer
+  src/server/              # session.ts (JSON-RPC session) + stdio.ts (entrypoint) — the sidecar
+  src/index.ts             # barrel — the public API the extension imports (NOT server/stdio.ts,
+                            # which has a top-level auto-start side effect; import it directly)
+  # ALL unit tests live here now (84, run: npm test -w @xprei/core)
 extensions/xpreiIDE-ai/    # the VS Code platform layer — imports @xprei/core
   src/providers/           # registry.ts, addProviderFlow.ts (config/secrets/QuickPick)
   src/context/             # contextEngine.ts, projectRules.ts (vscode.fs/index persistence)
@@ -61,7 +64,12 @@ extensions/xpreiIDE-ai/    # the VS Code platform layer — imports @xprei/core
   src/agent/               # host.ts (VscodeAgentHost), runner.ts, editDecorations.ts
   src/completion/          # ghost-text inline completions
   src/git/                 # SCM commit-message generation
-  src/ui/chat/ + media/    # chat webview
+  src/ui/chat/             # chat webview host (chatView.ts)
+  media/                   # GENERATED copy of webview/ (gitignored) — see scripts/sync-webview.mjs
+  scripts/sync-webview.mjs # copies webview/ -> media/, runs as a `compile` pre-step
+webview/                    # shared chat UI (chat.js/css, icons) — host-agnostic, reused by
+                            # future JetBrains/Eclipse plugins. bridge.js is the transport shim:
+                            # window.xprei = { postMessage, onMessage }, one contract, three hosts.
 plugins/intellij/          # JetBrains plugin — planned (multi-IDE plan Phase 2)
 plugins/eclipse/           # Eclipse plugin — planned (Phase 3)
 docs/                      # specs (superpowers/specs) + multi-ide-plan.md
@@ -98,7 +106,7 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 
 ```
 npm install                          # from repo ROOT — links @xprei/core into the extension
-npm test -w @xprei/core              # 71 tests, all pure/headless (node --import tsx --test)
+npm test -w @xprei/core              # 84 tests, all pure/headless (node --import tsx --test)
 npm run typecheck -w @xprei/core     # core tsc --noEmit
 npm run typecheck -w xpreiIDE-ai     # extension tsc --noEmit (resolves @xprei/core via workspace)
 npm run compile -w xpreiIDE-ai       # esbuild → dist/extension.js (inlines @xprei/core from source)

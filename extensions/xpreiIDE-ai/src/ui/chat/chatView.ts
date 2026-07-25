@@ -427,6 +427,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private html(webview: vscode.Webview): string {
     const nonce = getNonce();
+    const bridgeUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "media", "bridge.js"),
+    );
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "media", "chat.js"),
     );
@@ -525,6 +528,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       <button type="button" id="resetBtn" class="ghostBtn">Reset</button>
     </div>
   </form>
+  <script nonce="${nonce}" src="${bridgeUri}"></script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
