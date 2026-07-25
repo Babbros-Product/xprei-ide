@@ -15,6 +15,7 @@ import {
   formatHits,
   MIN_SCORE,
   SegmentTier,
+  TRUNCATION_MARKER,
 } from "@xprei/core";
 import { VectorStore, SearchHit } from "@xprei/core";
 import { isExcludedPath, SCAN_EXCLUDE } from "@xprei/core";
@@ -174,11 +175,13 @@ export class ContextEngine {
       ...(seg.data as FileContext),
       content: seg.text,
     }));
+    // "skip" never truncates, so seg.text === chunk.text and data can be used raw.
+    // If this tier ever becomes "break", reconstruct from seg.text like files do.
     const budgetedHits: SearchHit[] = keptHitSegs.map((seg) => seg.data as SearchHit);
 
     return buildContextMessage({
       files: budgetedFiles.length ? formatFiles(budgetedFiles, Number.POSITIVE_INFINITY) : undefined,
-      retrieved: budgetedHits.length ? formatHits(budgetedHits) : undefined,
+      retrieved: budgetedHits.length ? formatHits(budgetedHits, Number.NEGATIVE_INFINITY) : undefined,
     });
   }
 
@@ -203,7 +206,7 @@ export class ContextEngine {
         const bytes = await vscode.workspace.fs.readFile(uri);
         const raw = Buffer.from(bytes).toString("utf8");
         const content =
-          raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) + "\n…(truncated)" : raw;
+          raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) + TRUNCATION_MARKER : raw;
         out.push({ path: this.rel(uri), content });
       } catch {
         // ignore unreadable / missing

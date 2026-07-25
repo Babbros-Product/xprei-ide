@@ -107,8 +107,13 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
   auto-discovery on activation) done; Phase 2b (per-role models —
   `completionModel`/`agentModel`/`inlineEditModel`/`commitMessageModel`,
   each falling back to `activeModel`) done; Phase 3 (context-window
-  budgeting) done. Remaining phases (4 onward: richer context providers,
-  `multi_edit`, shared config, MCP, true FIM, CLI extension) not started.
+  budgeting) done; Phase 4's foundation sub-project (generalizing
+  `budgetContext()` from hardcoded files/hits into a provider-agnostic
+  tier/segment model, groundwork for the six upcoming context providers)
+  done. Phase 4a-4e (the six actual providers — `@terminal`, `@problems`,
+  `@diff`, `@open`, `@url`, repo-map) not started yet. Remaining phases (5
+  onward: `multi_edit`, shared config, MCP, true FIM, CLI extension) not
+  started.
 - **Marketplace publish** — not started. Extension is publish-ready
   (`package.json` has publisher/license/icon/categories/keywords,
   `.vscodeignore` and `LICENSE` present, `vscode:prepublish` runs the

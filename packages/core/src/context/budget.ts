@@ -12,6 +12,13 @@
 // hits, or a future Phase 4 provider) can round-trip its own shape
 // through this generic utility — callers downcast `data` back to their
 // own type immediately after budgeting.
+//
+// Returns one array per input tier, in the SAME POSITIONAL ORDER as the
+// input `tiers` array — callers destructure by position
+// (`const [a, b] = budgetContext([tierA, tierB], window)`), so every tier
+// a caller cares about must be built and included in `tiers`
+// UNCONDITIONALLY, even when empty. Conditionally omitting a tier shifts
+// every later tier's index with no type error.
 
 export const CHARS_PER_TOKEN = 4;
 export const CONTEXT_BLOCK_FRACTION = 0.5;

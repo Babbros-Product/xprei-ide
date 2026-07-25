@@ -2,6 +2,7 @@
 // Pure module — no vscode.
 
 import { SearchHit } from "./vectorstore";
+import { TRUNCATION_MARKER } from "./budget";
 
 export interface FileContext {
   path: string;
@@ -23,7 +24,7 @@ export function formatHits(hits: SearchHit[], minScore = MIN_SCORE): string {
 
 export function formatFiles(files: FileContext[], maxChars = 8000): string {
   const blocks = files.map((f) => {
-    const body = f.content.length > maxChars ? f.content.slice(0, maxChars) + "\n…(truncated)" : f.content;
+    const body = f.content.length > maxChars ? f.content.slice(0, maxChars) + TRUNCATION_MARKER : f.content;
     return `// FILE: ${f.path}\n${body}`;
   });
   return blocks.join("\n\n");
