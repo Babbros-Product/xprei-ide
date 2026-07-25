@@ -72,6 +72,30 @@ export class ProviderRegistry {
     return this.resolvePointer("embedModel");
   }
 
+  // Resolve the completion model (xpreiIDE.completionModel), falling back
+  // to the chat model (xpreiIDE.activeModel) when unset.
+  async resolveCompletion(): Promise<ResolvedModel | undefined> {
+    return this.resolvePointer("completionModel", "activeModel");
+  }
+
+  // Resolve the agent-loop model (xpreiIDE.agentModel), falling back to
+  // the chat model (xpreiIDE.activeModel) when unset.
+  async resolveAgent(): Promise<ResolvedModel | undefined> {
+    return this.resolvePointer("agentModel", "activeModel");
+  }
+
+  // Resolve the inline-edit (Cmd/Ctrl+K) model (xpreiIDE.inlineEditModel),
+  // falling back to the chat model (xpreiIDE.activeModel) when unset.
+  async resolveInlineEdit(): Promise<ResolvedModel | undefined> {
+    return this.resolvePointer("inlineEditModel", "activeModel");
+  }
+
+  // Resolve the commit-message model (xpreiIDE.commitMessageModel),
+  // falling back to the chat model (xpreiIDE.activeModel) when unset.
+  async resolveCommitMessage(): Promise<ResolvedModel | undefined> {
+    return this.resolvePointer("commitMessageModel", "activeModel");
+  }
+
   // Aggregate every model from every configured provider, for the chat
   // panel's model picker. Never throws — a provider that fails to list
   // models is skipped (or falls back to its configured default model).
@@ -82,12 +106,22 @@ export class ProviderRegistry {
     return aggregateModels(this.getConfigs(), (cfg) => this.build(cfg), activePointer);
   }
 
-  private async resolvePointer(setting: string): Promise<ResolvedModel | undefined> {
+  // Reads xpreiIDE.<setting> as a "providerId::model" pointer. If it's
+  // empty/unparseable and fallbackSetting is given, resolves that setting
+  // instead — this is how e.g. an unset completionModel falls back to
+  // activeModel. Public: extension.ts's selectModel() QuickPick previews
+  // the effective (fallback-resolved) model before writing an override.
+  async resolvePointer(
+    setting: string,
+    fallbackSetting?: string,
+  ): Promise<ResolvedModel | undefined> {
     const pointer = vscode.workspace
       .getConfiguration("xpreiIDE")
       .get<string>(setting, "");
     const parsed = ProviderRegistry.parsePointer(pointer);
-    if (!parsed) return undefined;
+    if (!parsed) {
+      return fallbackSetting ? this.resolvePointer(fallbackSetting) : undefined;
+    }
     const cfg = this.getConfigs().find((c) => c.id === parsed.providerId);
     if (!cfg) return undefined;
     return { provider: await this.build(cfg), model: parsed.model };
