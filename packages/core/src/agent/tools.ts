@@ -22,6 +22,11 @@ function str(args: Record<string, unknown>, key: string): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
+function num(args: Record<string, unknown>, key: string): number | undefined {
+  const v = args[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
 function truncate(s: string): string {
   return s.length > MAX_OBS ? s.slice(0, MAX_OBS) + "\n… (truncated)" : s;
 }
@@ -49,6 +54,39 @@ export const TOOLS: Tool[] = [
       } catch (err) {
         return { observation: `Error: cannot read ${path}. ${errText(err)}` };
       }
+    },
+  },
+  {
+    name: "read_file_range",
+    description:
+      "Read a 1-indexed, inclusive line range from a UTF-8 text file. " +
+      "Out-of-range lines clamp to the file's bounds. Returns numbered lines.",
+    args: '{ "path": string, "startLine": number, "endLine": number }',
+    mutating: false,
+    async run(args, host) {
+      const path = str(args, "path");
+      const startLine = num(args, "startLine");
+      const endLine = num(args, "endLine");
+      if (!path || startLine === undefined || endLine === undefined) {
+        return { observation: "Error: 'path', 'startLine', and 'endLine' are required." };
+      }
+      let content: string;
+      try {
+        content = await host.readFile(path);
+      } catch (err) {
+        return { observation: `Error: cannot read ${path}. ${errText(err)}` };
+      }
+      const lines = content.split(/\r?\n/);
+      const start = Math.max(1, Math.floor(startLine));
+      const end = Math.min(lines.length, Math.floor(endLine));
+      if (start > end) {
+        return { observation: `Error: startLine (${start}) is after endLine (${end}) in ${path}.` };
+      }
+      const numbered = lines
+        .slice(start - 1, end)
+        .map((l, i) => `${start + i}\t${l}`)
+        .join("\n");
+      return { observation: truncate(numbered) };
     },
   },
   {

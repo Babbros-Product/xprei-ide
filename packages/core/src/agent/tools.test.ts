@@ -63,3 +63,37 @@ test("grep formats file:line hits", async () => {
   assert.match(r.observation, /a\.ts:1/);
   assert.match(r.observation, /a\.ts:2/);
 });
+
+test("read_file_range returns only the requested lines, 1-indexed", async () => {
+  const host = new FakeHost({ "a.ts": "one\ntwo\nthree\nfour\nfive" });
+  const r = await tool("read_file_range").run({ path: "a.ts", startLine: 2, endLine: 4 }, host);
+  assert.match(r.observation, /2\ttwo/);
+  assert.match(r.observation, /3\tthree/);
+  assert.match(r.observation, /4\tfour/);
+  assert.doesNotMatch(r.observation, /one/);
+  assert.doesNotMatch(r.observation, /five/);
+});
+
+test("read_file_range clamps startLine below 1 and endLine past the file end", async () => {
+  const host = new FakeHost({ "a.ts": "one\ntwo\nthree" });
+  const r = await tool("read_file_range").run({ path: "a.ts", startLine: -5, endLine: 999 }, host);
+  assert.match(r.observation, /1\tone/);
+  assert.match(r.observation, /3\tthree/);
+});
+
+test("read_file_range errors when startLine > endLine after clamping", async () => {
+  const host = new FakeHost({ "a.ts": "one\ntwo\nthree" });
+  const r = await tool("read_file_range").run({ path: "a.ts", startLine: 3, endLine: 1 }, host);
+  assert.match(r.observation, /Error/);
+});
+
+test("read_file_range errors on missing args", async () => {
+  const host = new FakeHost({ "a.ts": "one" });
+  const r = await tool("read_file_range").run({ path: "a.ts" }, host);
+  assert.match(r.observation, /Error/);
+});
+
+test("read_file_range reports a missing file", async () => {
+  const r = await tool("read_file_range").run({ path: "nope.ts", startLine: 1, endLine: 2 }, new FakeHost());
+  assert.match(r.observation, /Error/);
+});
