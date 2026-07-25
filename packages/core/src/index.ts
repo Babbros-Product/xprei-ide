@@ -23,6 +23,7 @@ export * from "./edit/prompt";
 
 // Agent
 export * from "./agent/host";
+export * from "./agent/glob";
 export * from "./agent/pathResolve";
 export * from "./agent/protocol";
 export * from "./agent/tools";

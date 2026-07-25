@@ -6,7 +6,15 @@
 import * as vscode from "vscode";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
-import { AgentHost, ExecResult, GrepHit, resolveWorkspacePath } from "@xprei/core";
+import {
+  AgentHost,
+  ExecResult,
+  GrepHit,
+  resolveWorkspacePath,
+  collectGlobMatches,
+  DirEntry,
+  isExcludedPath,
+} from "@xprei/core";
 
 const execAsync = promisify(execCb);
 
@@ -14,6 +22,7 @@ const MAX_GREP_HITS = 50;
 const GREP_EXCLUDE = "{**/node_modules/**,**/.git/**,**/dist/**,**/out/**}";
 const EXEC_TIMEOUT_MS = 120_000;
 const EXEC_MAX_BUFFER = 4 * 1024 * 1024;
+const MAX_GLOB_RESULTS = 200;
 
 // VS Code-backed host rooted at the first workspace folder.
 export class VscodeAgentHost implements AgentHost {
@@ -96,6 +105,27 @@ export class VscodeAgentHost implements AgentHost {
       }
     }
     return hits;
+  }
+
+  async glob(pattern: string, p?: string): Promise<string[]> {
+    const start = this.resolve(p || ".");
+    return collectGlobMatches(
+      pattern,
+      start.fsPath,
+      async (dir) => {
+        const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(dir));
+        return entries.map(
+          ([name, kind]): DirEntry => ({
+            name,
+            isDirectory: kind === vscode.FileType.Directory,
+          }),
+        );
+      },
+      (abs) => vscode.workspace.asRelativePath(vscode.Uri.file(abs), false),
+      (a, b) => vscode.Uri.joinPath(vscode.Uri.file(a), b).fsPath,
+      (rel) => isExcludedPath(rel),
+      MAX_GLOB_RESULTS,
+    );
   }
 
   async exec(command: string): Promise<ExecResult> {
