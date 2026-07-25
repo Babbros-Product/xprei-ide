@@ -121,6 +121,23 @@ Six more mentions need no indexing at all:
 
 Combine any of these in one message, e.g. `@diff @problems review my changes`.
 
+## Project instructions & ignore file
+
+Two optional dotfiles at your workspace root, both read fresh every
+time they're needed (no caching, no reload required):
+
+- **`.xpreiIDErules`** — plain text, injected into every chat/edit/agent
+  system prompt as extra project-specific instructions.
+- **`.xpreiIDEignore`** — one pattern per line, `.gitignore`-lite syntax
+  (`#` comments, blank lines ignored, `*` within a path segment, `**`
+  across segments, a pattern containing `/` anchors to the workspace
+  root, a pattern without `/` matches at any depth). Adds to, not
+  replaces, the indexer's built-in exclusions (`node_modules`, `.git`,
+  `dist`, and similar are always excluded regardless of this file).
+  Affects the codebase index, `@open`, and `@repomap` — **not** the
+  agent's `grep`/`glob` tools. Not a full `.gitignore` implementation:
+  `!` negation and backslash escaping aren't supported.
+
 ## Inline edit (Cmd-K)
 
 Select code, press **Cmd-K** (Ctrl-K on Windows/Linux), type an instruction. The

@@ -186,6 +186,9 @@ configuration (runtime workbench).
   actions (Explain / Fix / Tests / Comments / Refactor).
 - **Project rules** — a `.xpreiIDErules` file at your workspace root is injected
   into every prompt.
+- **Ignore file** — a `.xpreiIDEignore` file (`.gitignore`-lite syntax)
+  excludes extra paths from the codebase index, on top of the built-in
+  exclusions.
 
 > Feature availability rolls out per IDE — VS Code has the full set today;
 > JetBrains and Eclipse ship an MVP (chat + BYO-model + agent loop) first, with the
