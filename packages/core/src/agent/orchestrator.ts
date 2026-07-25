@@ -20,6 +20,9 @@ export interface AgentEvents {
   onObservation(text: string): void;
   onFinal(text: string): void;
   onError(text: string): void;
+  // Fired on each protocolError retry (not on the final give-up, which uses
+  // onError instead). Optional, like onEdit, for headless/test callers.
+  onProtocolError?(attempt: number, maxAttempts: number, reason: string): void;
   // Fired after a mutating tool successfully writes a file — before/after
   // content for editor-side feedback (e.g. a gutter flash). Optional so
   // headless/test callers don't need to implement it.
@@ -39,12 +42,18 @@ export interface AgentDeps {
   events: AgentEvents;
   tools?: Tool[];
   maxSteps?: number;
+  // Consecutive parse failures tolerated before giving up. Default 2 (3
+  // attempts total). Resets to 0 on any successfully-parsed action, so a
+  // model that's flaky once every several turns never approaches the cap
+  // over a long run.
+  protocolRetries?: number;
   // Extra project-level instructions (from .xpreiIDErules) appended to the
   // system prompt, verbatim.
   projectRules?: string;
 }
 
 const DEFAULT_MAX_STEPS = 0; // 0 = unlimited (bounded only by Stop/abort or the model finishing)
+const DEFAULT_PROTOCOL_RETRIES = 2;
 
 export class Agent {
   private readonly tools: Tool[];
@@ -66,6 +75,8 @@ export class Agent {
     ];
     const maxSteps = this.deps.maxSteps ?? DEFAULT_MAX_STEPS;
     const unlimited = maxSteps <= 0;
+    const protocolRetries = this.deps.protocolRetries ?? DEFAULT_PROTOCOL_RETRIES;
+    let protocolFailures = 0;
 
     for (let step = 1; unlimited || step <= maxSteps; step++) {
       if (signal?.aborted) return;
@@ -83,16 +94,24 @@ export class Agent {
       const action = parseAction(raw);
       if (action.thought) this.deps.events.onThought(action.thought);
 
+      if (action.kind === "protocolError") {
+        protocolFailures++;
+        if (protocolFailures > protocolRetries) {
+          this.deps.events.onError(
+            `Model did not return a valid response after ${protocolFailures} attempts ` +
+              `(${action.reason}). Try a different/larger model, or raise xpreiIDE.agent.protocolRetries.`,
+          );
+          return;
+        }
+        this.deps.events.onProtocolError?.(protocolFailures, protocolRetries + 1, action.reason);
+        messages.push({ role: "user", content: `Protocol error: ${action.reason}` });
+        continue;
+      }
+      protocolFailures = 0;
+
       if (action.kind === "final") {
         this.deps.events.onFinal(action.text);
         return;
-      }
-
-      if (action.kind === "protocolError") {
-        const observation = action.reason;
-        this.deps.events.onObservation(observation);
-        messages.push({ role: "user", content: `Observation:\n${observation}` });
-        continue;
       }
 
       const observation = await this.runTool(action);

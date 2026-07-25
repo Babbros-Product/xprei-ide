@@ -173,3 +173,70 @@ test("a restricted tool set rejects tools outside it", async () => {
   assert.deepEqual(host.execCalls, []);
   assert.ok(log.some((l) => l.startsWith("obs:Error: unknown tool")));
 });
+
+test("agent retries on protocol errors and recovers within the cap", async () => {
+  const host = new FakeHost({ "a.ts": "hello" });
+  const { events, log } = recorder();
+  const protocolErrors: [number, number][] = [];
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      "garbage",
+      "garbage",
+      '{"tool":"read_file","args":{"path":"a.ts"}}',
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events: { ...events, onProtocolError: (a, m) => protocolErrors.push([a, m]) },
+  });
+  await agent.run("do it");
+  assert.deepEqual(protocolErrors, [[1, 3], [2, 3]]);
+  assert.ok(log.includes("tool:read_file"));
+  assert.ok(log.includes("final:done"));
+});
+
+test("agent resets the protocol-failure counter after a successful parse", async () => {
+  const host = new FakeHost({ "a.ts": "hello" });
+  const { events, log } = recorder();
+  const protocolErrors: number[] = [];
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      "garbage",
+      "garbage",
+      '{"tool":"read_file","args":{"path":"a.ts"}}',
+      "garbage",
+      "garbage",
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events: { ...events, onProtocolError: (attempt) => protocolErrors.push(attempt) },
+  });
+  await agent.run("do it");
+  // Two independent 1,2 pairs prove the counter reset after the successful
+  // tool call rather than accumulating — a cumulative counter would have
+  // hit the default cap (2 retries) on the second pair's first failure and
+  // never reached "final".
+  assert.deepEqual(protocolErrors, [1, 2, 1, 2]);
+  assert.ok(log.includes("final:done"));
+  assert.ok(!log.some((l) => l.startsWith("error:")));
+});
+
+test("agent gives up with onError after exceeding the protocol-retry cap", async () => {
+  const host = new FakeHost();
+  const { events, log } = recorder();
+  const agent = new Agent({
+    provider: new ScriptedProvider(["garbage"]), // repeats forever once exhausted
+    model: "m",
+    host,
+    approver: yes,
+    events,
+  });
+  await agent.run("do it");
+  assert.ok(!log.includes("final:done"));
+  const errorLine = log.find((l) => l.startsWith("error:"));
+  assert.ok(errorLine, "expected an error: log entry");
+  assert.match(errorLine!, /after 3 attempts/);
+});
