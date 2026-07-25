@@ -4,6 +4,7 @@
 // incrementally as files change.
 
 import * as vscode from "vscode";
+import { lookup } from "node:dns/promises";
 import { ProviderRegistry } from "../providers/registry";
 import { getGitApi } from "../git/gitApi";
 import { chunkFile, Chunk } from "@xprei/core";
@@ -17,9 +18,13 @@ import {
   formatHits,
   formatProblems,
   formatTerminal,
+  formatUrl,
+  isBlockedAddress,
+  isSafeUrl,
   MIN_SCORE,
   ProblemInfo,
   SegmentTier,
+  stripHtml,
   TRUNCATION_MARKER,
 } from "@xprei/core";
 import { VectorStore, SearchHit } from "@xprei/core";
@@ -37,6 +42,9 @@ const TERMINAL_EXEC_TIMEOUT_MS = 120_000;
 // going to (some shells/environments never enable it), so there's no
 // reason to burn the full 120s exec budget waiting for it.
 const SHELL_INTEGRATION_TIMEOUT_MS = 5_000;
+const MAX_URL_BYTES = 500_000;
+const URL_FETCH_TIMEOUT_MS = 10_000;
+const MAX_URL_REDIRECTS = 5;
 
 export class ContextEngine {
   private store = new VectorStore();
@@ -155,11 +163,12 @@ export class ContextEngine {
   // concatenating everything the mentions resolved to. Tier priority
   // (highest to lowest): @file: ("break", explicit request) > @problems
   // ("skip", compact and actionable) > @diff ("break", one segment) >
-  // @terminal ("break", one segment, confirmation-gated) > @open
-  // ("break", bulkier, ordered like files) > @codebase hits ("skip", a
-  // relevance guess). Every tier is built unconditionally (even when
-  // empty) — budgetContext's return value is positionally aligned with
-  // the input tier array.
+  // @terminal ("break", one segment, confirmation-gated) > @url
+  // ("break", one segment, SSRF-checked) > @open ("break", bulkier,
+  // ordered like files) > @codebase hits ("skip", a relevance guess).
+  // Every tier is built unconditionally (even when empty) —
+  // budgetContext's return value is positionally aligned with the input
+  // tier array.
   async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
@@ -183,6 +192,7 @@ export class ContextEngine {
     const terminalOutput = mentions.terminalCommand
       ? await this.runTerminalCommand(mentions.terminalCommand)
       : "";
+    const urlContent = mentions.url ? await this.fetchUrl(mentions.url) : "";
 
     const fileTier: SegmentTier = {
       segments: files.map((f) => ({ text: f.content, data: f })),
@@ -202,6 +212,10 @@ export class ContextEngine {
         : [],
       strategy: "break",
     };
+    const urlTier: SegmentTier = {
+      segments: urlContent ? [{ text: formatUrl(mentions.url!, urlContent), data: null }] : [],
+      strategy: "break",
+    };
     const openTier: SegmentTier = {
       segments: openFiles.map((f) => ({ text: f.content, data: f })),
       strategy: "break",
@@ -212,8 +226,18 @@ export class ContextEngine {
       strategy: "skip",
     };
 
-    const [keptFileSegs, keptProblemSegs, keptDiffSegs, keptTerminalSegs, keptOpenSegs, keptHitSegs] =
-      budgetContext([fileTier, problemTier, diffTier, terminalTier, openTier, hitTier], contextWindow);
+    const [
+      keptFileSegs,
+      keptProblemSegs,
+      keptDiffSegs,
+      keptTerminalSegs,
+      keptUrlSegs,
+      keptOpenSegs,
+      keptHitSegs,
+    ] = budgetContext(
+      [fileTier, problemTier, diffTier, terminalTier, urlTier, openTier, hitTier],
+      contextWindow,
+    );
 
     const budgetedFiles: FileContext[] = keptFileSegs.map((seg) => ({
       ...(seg.data as FileContext),
@@ -228,6 +252,9 @@ export class ContextEngine {
     // "break" may have truncated this — always reconstruct from seg.text,
     // not from the original (unbudgeted) command output.
     const budgetedTerminal: string | undefined = keptTerminalSegs[0]?.text;
+    // "break" may have truncated this — always reconstruct from seg.text,
+    // not from the original (unbudgeted) fetched content.
+    const budgetedUrl: string | undefined = keptUrlSegs[0]?.text;
     const budgetedOpenFiles: FileContext[] = keptOpenSegs.map((seg) => ({
       ...(seg.data as FileContext),
       content: seg.text,
@@ -243,6 +270,7 @@ export class ContextEngine {
       problems: budgetedProblems.length ? formatProblems(budgetedProblems) : undefined,
       diff: budgetedDiff,
       terminal: budgetedTerminal,
+      url: budgetedUrl,
       retrieved: budgetedHits.length ? formatHits(budgetedHits, Number.NEGATIVE_INFINITY) : undefined,
     });
   }
@@ -451,6 +479,92 @@ export class ContextEngine {
       return await this.executeAndRead(terminal, command, Date.now() + TERMINAL_EXEC_TIMEOUT_MS);
     } catch {
       return "";
+    }
+  }
+
+  // Resolves hostname to every address it maps to and blocks the whole
+  // URL if ANY of them is private/loopback/link-local — a hostname that
+  // resolves to multiple addresses (some public, some not) is treated as
+  // unsafe rather than picking one. Fails closed: an unresolvable
+  // hostname is also treated as blocked, since there's nothing safe to
+  // fetch.
+  private async isHostnameBlocked(hostname: string): Promise<boolean> {
+    try {
+      const addresses = await lookup(hostname, { all: true });
+      return addresses.length === 0 || addresses.some((a) => isBlockedAddress(a.address));
+    } catch {
+      return true;
+    }
+  }
+
+  // Follows redirects manually (never trusts fetch's own redirect
+  // following), re-validating scheme and resolved-address safety at
+  // EVERY hop — a public URL redirecting to a blocked target must not
+  // bypass the check. Shares one AbortSignal across every fetch() call
+  // in the loop, so the 10s deadline covers the whole chain of
+  // redirects, not each hop individually.
+  private async fetchUrlWithRedirects(address: string, signal: AbortSignal): Promise<string> {
+    let current = address;
+    for (let hop = 0; hop <= MAX_URL_REDIRECTS; hop++) {
+      let parsed: URL;
+      try {
+        parsed = new URL(current);
+      } catch {
+        return "";
+      }
+      if (!isSafeUrl(parsed)) return "";
+      if (await this.isHostnameBlocked(parsed.hostname)) return "";
+
+      const res = await fetch(parsed.toString(), { redirect: "manual", signal });
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get("location");
+        if (!location) return "";
+        current = new URL(location, parsed).toString();
+        continue; // loop back to the top — re-validates the redirect target
+      }
+
+      if (!res.ok || !res.body) return "";
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let text = "";
+      let bytesRead = 0;
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          bytesRead += value.byteLength;
+          if (bytesRead > MAX_URL_BYTES) {
+            text += TRUNCATION_MARKER;
+            break;
+          }
+          text += decoder.decode(value, { stream: true });
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+      return contentType.includes("html") ? stripHtml(text) : text;
+    }
+    return ""; // too many redirects
+  }
+
+  // Fetches a URL, scheme- and IP-range-checked (never file:// or a
+  // private/loopback/link-local target, at every redirect hop), within a
+  // single 10-second deadline for the whole operation. "" on any
+  // failure: blocked target, network error, timeout, non-2xx response,
+  // or too many redirects.
+  private async fetchUrl(address: string): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
+    try {
+      return await this.fetchUrlWithRedirects(address, controller.signal);
+    } catch {
+      return "";
+    } finally {
+      clearTimeout(timer);
     }
   }
 
