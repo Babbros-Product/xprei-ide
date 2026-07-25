@@ -18,6 +18,14 @@ const QUICK_ACTIONS: { kind: QuickActionKind; command: string }[] = [
   { kind: "refactor", command: "xpreiIDE.refactorSelection" },
 ];
 
+type ModelSetting =
+  | "activeModel"
+  | "embedModel"
+  | "completionModel"
+  | "agentModel"
+  | "inlineEditModel"
+  | "commitMessageModel";
+
 export function activate(context: vscode.ExtensionContext): void {
   const registry = new ProviderRegistry(context.secrets);
   const log = vscode.window.createOutputChannel("xpreiIDE");
@@ -120,11 +128,14 @@ export function deactivate(): void {
 }
 
 // Two-step QuickPick: choose a provider, then a model it reports. Persisted to
-// the given setting ("activeModel" or "embedModel") as "providerId::model".
+// the given setting as "providerId::model". When fallbackSetting is given and
+// a resolution already exists (an explicit override or the fallback itself),
+// offers a "clear override" shortcut before the provider/model picker.
 async function selectModel(
   registry: ProviderRegistry,
-  setting: "activeModel" | "embedModel",
+  setting: ModelSetting,
   role: string,
+  fallbackSetting?: "activeModel",
 ): Promise<void> {
   const configs = registry.getConfigs();
   if (configs.length === 0) {
@@ -132,6 +143,30 @@ async function selectModel(
       "No providers configured. Add one under Settings → xpreiIDE.providers.",
     );
     return;
+  }
+
+  if (fallbackSetting) {
+    const effective = await registry.resolvePointer(setting, fallbackSetting);
+    if (effective) {
+      const choice = await vscode.window.showQuickPick(
+        [
+          {
+            label: `Clear override (use Chat model: ${effective.provider.label}/${effective.model})`,
+            action: "clear" as const,
+          },
+          { label: `Choose a specific model for ${role}...`, action: "choose" as const },
+        ],
+        { placeHolder: `Configure the ${role} model` },
+      );
+      if (!choice) return;
+      if (choice.action === "clear") {
+        await vscode.workspace
+          .getConfiguration("xpreiIDE")
+          .update(setting, "", vscode.ConfigurationTarget.Global);
+        vscode.window.showInformationMessage(`xpreiIDE ${role} now follows the Chat model.`);
+        return;
+      }
+    }
   }
 
   const pickedProvider = await pickProvider(configs, `Select a provider for ${role}`);
