@@ -172,8 +172,9 @@ export function deactivate(): void {
 
 // Two-step QuickPick: choose a provider, then a model it reports. Persisted to
 // the given setting as "providerId::model". When fallbackSetting is given and
-// a resolution already exists (an explicit override or the fallback itself),
-// offers a "clear override" shortcut before the provider/model picker.
+// the role's OWN setting is non-empty (an explicit override — even a stale one
+// whose provider was since removed), offers a "clear override" shortcut before
+// the provider/model picker.
 async function selectModel(
   registry: ProviderRegistry,
   setting: ModelSetting,
@@ -189,14 +190,13 @@ async function selectModel(
   }
 
   if (fallbackSetting) {
-    const effective = await registry.resolvePointer(setting, fallbackSetting);
-    if (effective) {
+    const raw = vscode.workspace.getConfiguration("xpreiIDE").get<string>(setting, "");
+    if (raw) {
+      const chat = await registry.resolvePointer(fallbackSetting);
+      const chatLabel = chat ? `${chat.provider.label}/${chat.model}` : "not set";
       const choice = await vscode.window.showQuickPick(
         [
-          {
-            label: `Clear override (use Chat model: ${effective.provider.label}/${effective.model})`,
-            action: "clear" as const,
-          },
+          { label: `Clear override (use Chat model: ${chatLabel})`, action: "clear" as const },
           { label: `Choose a specific model for ${role}...`, action: "choose" as const },
         ],
         { placeHolder: `Configure the ${role} model` },

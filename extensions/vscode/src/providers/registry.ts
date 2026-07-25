@@ -107,10 +107,12 @@ export class ProviderRegistry {
   }
 
   // Reads xpreiIDE.<setting> as a "providerId::model" pointer. If it's
-  // empty/unparseable and fallbackSetting is given, resolves that setting
-  // instead — this is how e.g. an unset completionModel falls back to
-  // activeModel. Public: extension.ts's selectModel() QuickPick previews
-  // the effective (fallback-resolved) model before writing an override.
+  // empty/unparseable, OR it parses but points at a provider config that no
+  // longer exists (e.g. removed via "Remove provider"), and fallbackSetting
+  // is given, resolves that setting instead — this is how e.g. an unset (or
+  // stale) completionModel falls back to activeModel. Public: extension.ts's
+  // selectModel() QuickPick previews the effective (fallback-resolved) model
+  // before writing an override.
   async resolvePointer(
     setting: string,
     fallbackSetting?: string,
@@ -123,7 +125,9 @@ export class ProviderRegistry {
       return fallbackSetting ? this.resolvePointer(fallbackSetting) : undefined;
     }
     const cfg = this.getConfigs().find((c) => c.id === parsed.providerId);
-    if (!cfg) return undefined;
+    if (!cfg) {
+      return fallbackSetting ? this.resolvePointer(fallbackSetting) : undefined;
+    }
     return { provider: await this.build(cfg), model: parsed.model };
   }
 
