@@ -22,6 +22,7 @@ export * from "./context/urlSafety";
 export * from "./context/htmlStrip";
 export * from "./context/repomap";
 export * from "./context/ignoreFile";
+export * from "./config/yamlLite";
 
 // Inline-edit prompt building
 export * from "./edit/prompt";
