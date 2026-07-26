@@ -242,13 +242,18 @@ waiting on a black box.
   too.
 
 **Safety and control:**
-- **Approval gates.** Every file write and every terminal command asks
-  for your approval first — you see exactly what's about to change
-  (a real before/after diff for edits) before it happens. **Approve
-  all** skips future prompts for the rest of that run, if you'd rather
-  not be asked every single step. Set `xpreiIDE.agent.autoApprove` to
-  skip prompting entirely (use with caution — this also affects MCP
-  tool calls, which have no way to signal whether they're safe).
+- **Approval gates + end-of-run review.** Every file write and terminal
+  command still asks for approval before the agent proceeds — but file
+  edits no longer land on disk one by one. They're held in memory and
+  presented at the end of the run as one **batch review**: a card of
+  per-file diffs, each with its own Accept/Reject, plus Accept all /
+  Reject all. Rejected files never touch disk at all. The one exception:
+  if the agent runs a terminal command mid-run, edits made before that
+  point are written first (the command needs real files to act on) —
+  those were each individually approved already. Set
+  `xpreiIDE.agent.autoApprove` to skip the per-step prompts (the batch
+  review still appears; MCP tool calls are also auto-approved, use with
+  caution).
 - **One-click revert.** Every agent run is checkpointed. **xpreiIDE:
   Revert Last Agent Run** undoes everything it did — restores edited
   files to how they were, deletes any files it created — in one step.

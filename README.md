@@ -177,8 +177,9 @@ configuration (runtime workbench).
   Role...`); any role left unconfigured follows the chat model.
 - **Agentic multi-file coder** — a universal JSON tool protocol that works even on
   smaller open-source models (no reliance on native function-calling), with
-  approval gates, one-click revert, and batched multi-edit (several
-  find/replace edits to one file in a single step).
+  approval gates, end-of-run batch diff review (rejected edits never touch
+  disk), one-click revert, and batched multi-edit (several find/replace edits
+  to one file in a single step).
 - **Codebase-aware context** — `@codebase` semantic retrieval, `@file:`
   mentions, `@open` (every open tab), `@problems` (current error/warning
   diagnostics), `@diff` (your current git diff), `@terminal:<command>`
