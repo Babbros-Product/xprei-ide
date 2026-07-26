@@ -7,7 +7,7 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
-import { stripCodeFences } from "@xprei/core";
+import { isFimCapableModel, stripCodeFences } from "@xprei/core";
 
 const DEBOUNCE_MS = 400;
 const MAX_PREFIX_LINES = 60;
@@ -58,26 +58,29 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
       return [new vscode.InlineCompletionItem(this.cache.text, new vscode.Range(position, position))];
     }
 
-    const userContent = suffix.trim()
-      ? `Code before <CURSOR>:\n${prefix}<CURSOR>\nCode after <CURSOR>:\n${suffix}`
-      : `Code before <CURSOR>:\n${prefix}<CURSOR>`;
-
     const ac = new AbortController();
     token.onCancellationRequested(() => ac.abort());
     const timeout = setTimeout(() => ac.abort(), TIMEOUT_MS);
 
     let out = "";
     try {
-      for await (const chunk of resolved.provider.chatStream({
-        model: resolved.model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
-        signal: ac.signal,
-      })) {
-        out += chunk.delta;
-        if (chunk.done) break;
+      if (resolved.provider.fillInMiddle && isFimCapableModel(resolved.model)) {
+        out = await resolved.provider.fillInMiddle(prefix, suffix, resolved.model, ac.signal);
+      } else {
+        const userContent = suffix.trim()
+          ? `Code before <CURSOR>:\n${prefix}<CURSOR>\nCode after <CURSOR>:\n${suffix}`
+          : `Code before <CURSOR>:\n${prefix}<CURSOR>`;
+        for await (const chunk of resolved.provider.chatStream({
+          model: resolved.model,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userContent },
+          ],
+          signal: ac.signal,
+        })) {
+          out += chunk.delta;
+          if (chunk.done) break;
+        }
       }
     } catch {
       return undefined; // aborted/cancelled/errored — no ghost text is the safe fallback
