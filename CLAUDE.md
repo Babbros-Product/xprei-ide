@@ -67,12 +67,14 @@ extensions/vscode/    # the VS Code platform layer — imports @xprei/core
   src/ui/chat/             # chat webview host (chatView.ts)
   media/                   # GENERATED copy of webview/ (gitignored) — see scripts/sync-webview.mjs
   scripts/sync-webview.mjs # copies webview/ -> media/, runs as a `compile` pre-step
-extensions/JetBrains/       # JetBrains plugin (Kotlin/Gradle) — scaffolded, NOT compiled/run yet
-                            # (written with no local JDK/Gradle to verify against — see
-                            # extensions/JetBrains/README.md before touching this code)
-extensions/eclipse/        # Eclipse plugin (Java/Tycho) — scaffolded, NOT compiled/run yet
-                            # (written with no local Maven to verify against — see
-                            # extensions/eclipse/README.md before touching this code)
+extensions/JetBrains/       # JetBrains plugin (Kotlin/Gradle) — compiles and packages
+                            # cleanly (verified 2026-07-26 with a real JDK 21/Gradle
+                            # 9.6.1); NOT yet run in a sandbox IDE — see
+                            # extensions/JetBrains/README.md before touching this code
+extensions/eclipse/        # Eclipse plugin (Java/Tycho) — compiles and packages
+                            # cleanly (verified 2026-07-26 with a real JDK 21/Maven
+                            # 3.9.16); NOT yet run in a live Eclipse instance — see
+                            # extensions/eclipse/README.md before touching this code
 webview/                    # shared chat UI (chat.js/css, icons) — host-agnostic, reused by
                             # the intellij/eclipse plugins. bridge.js is the transport shim:
                             # window.xprei = { postMessage, onMessage }, one contract, three hosts.

@@ -34,7 +34,12 @@
         <version>${tycho.version}</version>
         <configuration>
           <target>
-            <file>target-platform/target-platform.target</file>
+            <!-- This plugin config lives in the parent pom but Tycho
+                 resolves <file> relative to the executing module's
+                 basedir (the child, online.xprei.ide.eclipse/), not the
+                 parent's — hence "../" to reach this file, which lives
+                 alongside this parent pom. -->
+            <file>../target-platform/target-platform.target</file>
           </target>
           <!-- Adjust/add environments as needed; Windows is what this was
                written on. Cross-platform builds need every OS/WS/arch triple

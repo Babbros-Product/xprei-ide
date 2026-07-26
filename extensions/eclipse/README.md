@@ -1,13 +1,16 @@
 # xpreiIDE — Eclipse plugin
 
-## ⚠️ Status: written, NOT compiled or run
+## ⚠️ Status: compiles and packages cleanly (verified 2026-07-26), NOT yet run in a live Eclipse instance
 
-Same situation as `extensions/JetBrains`: this was scaffolded on a machine with
-**no JDK, no Maven** installed (confirmed: `java`, `javac`, `mvn` all absent
-from PATH). Eclipse/Tycho builds are historically more finicky than Gradle
-(target-platform resolution, P2 repository availability, Tycho version
-drift), so treat this as an even-more-first-draft than the IntelliJ plugin —
-grounded via documentation search, not compiled, not run.
+This was originally scaffolded on a machine with no JDK/Maven installed and
+was unverified. It has since been built for real (JDK 21, Maven 3.9.16,
+Tycho 5.0.2): `mvn clean verify` succeeds end-to-end — target platform
+resolves, all 8 Java source files compile, the plugin jar is packaged. Two
+real bugs were found and fixed in the process (see "Bugs found by the first
+real build" below). What's still unverified: actually installing the built
+jar into a live Eclipse instance and exercising its runtime behavior (SWT
+`Browser`, `BrowserFunction`, Equinox Secure Storage, the sidecar process) —
+the Java compiles, but no one has clicked through the chat view yet.
 
 ### What to do first
 
@@ -18,38 +21,41 @@ mvn clean verify                                       # full Tycho build — re
                                                          # compiles, packages
 ```
 
-The most likely failure classes, in order of likelihood:
+### Bugs found by the first real build (fixed)
 
-1. **Target platform resolution.** `target-platform/target-platform.target`
-   points at `https://download.eclipse.org/releases/latest` — a real, live p2
-   repository, but the exact `org.eclipse.platform.feature.group` IU version
-   Tycho resolves is whatever "latest" is *when you run this*, which drifts.
-   If resolution fails or pulls something incompatible, pin to a dated
-   release (e.g. `.../releases/2024-12`) instead — more reproducible, less
-   convenient.
-2. **Tycho version drift.** `5.0.2` (in `pom.xml`'s `tycho.version` property
-   and `.mvn/extensions.xml`) was "current stable" per a web search at write
-   time (dated 2026-01-24 in the search result) — not verified against an
-   actual Maven run. Bump if resolution fails.
-3. **The `build-sidecar` exec-maven-plugin execution** (child pom.xml) shells
-   out to `npm run build:sidecar --workspace @xprei/core` from the repo root.
-   If `npm` isn't on the PATH Maven sees, this fails — run
-   `npm run build:sidecar -w @xprei/core` manually first to isolate that from
-   any real Tycho/Java issue.
-4. **`exec-maven-plugin` version `3.4.1`** and **`maven-resources-plugin`
-   version `3.3.1`** — both very standard, widely-used plugins, lower risk
-   than the Tycho-specific pieces, but still unverified here.
-5. **`META-INF/MANIFEST.MF`'s `Require-Bundle` list** — the exact set of
+1. **`target-platform-configuration`'s `<file>` path was wrong.** It's
+   declared in the parent `pom.xml` (so it applies to the one child module),
+   but Tycho resolves that path relative to the *executing* module's
+   basedir — the child (`online.xprei.ide.eclipse/`), not the parent's.
+   Since the `.target` file actually lives next to the parent pom, the path
+   needed a `../` prefix (`pom.xml`).
+2. **`Bundle-RequiredExecutionEnvironment: JavaSE-17` no longer satisfies
+   the current Eclipse release train.** The `2026-06` release resolved from
+   `.../releases/latest` includes `org.eclipse.help` requiring
+   `osgi.ee=JavaSE;version=21` — bumped the manifest to `JavaSE-21`
+   (`META-INF/MANIFEST.MF`) to match. This is exactly the "target platform
+   resolution drift" risk this file used to warn about under `/releases/
+   latest` — worth pinning to a dated release (e.g. `.../releases/2026-06`)
+   for reproducibility now that a working baseline exists, rather than
+   staying on a floating "latest" that can drift again.
+
+Note: the `build-sidecar` exec-maven-plugin execution (item previously
+flagged as a likely `npm`-on-Windows risk, same class of issue as the
+JetBrains plugin's Gradle `Exec` task) did **not** need a fix —
+`exec-maven-plugin` resolves `npm`/`npm.cmd` correctly on Windows without
+extra shell-wrapping, unlike Gradle's `Exec` task.
+
+### Remaining risk (not yet exercised)
+
+1. **`META-INF/MANIFEST.MF`'s `Require-Bundle` list** — the exact set of
    bundles needed (`org.eclipse.ui`, `org.eclipse.core.runtime`,
    `org.eclipse.core.resources`, `org.eclipse.swt`,
    `org.eclipse.equinox.security`, `org.eclipse.equinox.preferences`) was
-   reasoned from which packages the code imports (`ISecurePreferences` needs
-   `equinox.security`; `IEclipsePreferences`/`InstanceScope` needs
-   `equinox.preferences`, which isn't guaranteed transitively re-exported by
-   `core.runtime`), not confirmed against an actual OSGi resolution. A
-   missing bundle here fails as a runtime `ClassNotFoundException` or a
-   PDE/Tycho "cannot be resolved" error, not a compile error — if the Java
-   compiles but the plugin won't launch/resolve, check this file first.
+   reasoned from which packages the code imports, not confirmed against
+   actually launching the plugin in an Eclipse instance. A missing bundle
+   here fails as a runtime `ClassNotFoundException`, not a compile error —
+   check this file first if the jar installs but the plugin won't
+   activate/resolve.
 
 ## The one piece you can verify with almost nothing
 

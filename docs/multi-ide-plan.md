@@ -59,7 +59,7 @@ editor, (4) store secrets in the IDE's secure store, (5) persist config.
 
 ## Target repo layout (monorepo)
 
-Current state (Phases 0-1 done and verified; Phases 2-3 scaffolded, unverified):
+Current state (Phases 0-1 done and verified; Phases 2-3 compile/package cleanly, verified 2026-07-26, not yet run in a live IDE):
 
 ```
 xprei-ide/                      # repo root (was BABBROSIDE)
@@ -76,11 +76,11 @@ xprei-ide/                      # repo root (was BABBROSIDE)
     vscode/                     # VS Code extension (package name "xpreiIDE-ai") → consumes @xprei/core
       media/                    # GENERATED copy of webview/, gitignored
       scripts/sync-webview.mjs  # copies webview/ -> media/ pre-compile
-    JetBrains/                   # Kotlin/Gradle — scaffolded, NOT yet compiled
-                                 # (no local JDK/Gradle to verify against — see
+    JetBrains/                   # Kotlin/Gradle — compiles & packages (verified 2026-07-26)
+                                 # (real JDK 21/Gradle 9.6.1 build, not yet run in a sandbox IDE — see
                                  # extensions/JetBrains/README.md)
-    eclipse/                    # Java/Tycho — scaffolded, NOT yet compiled
-                                 # (no local Maven to verify against — see
+    eclipse/                    # Java/Tycho — compiles & packages (verified 2026-07-26)
+                                 # (real JDK 21/Maven 3.9.16 build, not yet run live — see
                                  # extensions/eclipse/README.md)
   webview/                      # shared chat UI, host-agnostic — chat.js/css,
                                  # bridge.js (transport shim), index.html,
@@ -163,7 +163,7 @@ Everything else in the webview (rendering, model picker, approvals) is untouched
   run that writes a real file through a real approval round-trip.
 - **84 tests** in `@xprei/core` by the end of this phase (+2 harness).
 
-### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform) — 🚧 scaffolded, **not yet compiled**
+### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform) — 🚧 compiles & packages (verified 2026-07-26), **not yet run in a sandbox IDE**
 Written on a machine with no local JDK/Gradle (confirmed absent) — everything
 below is code-complete but unverified by an actual build. See
 `extensions/JetBrains/README.md` for the full caveat, the exact list of
@@ -196,7 +196,7 @@ assumptions made without a compiler, and what to check first.
   `applyEdit` (no-ops), a revert-last-run command (the sidecar RPC exists and
   is tested; no menu entry yet). Full list in `extensions/JetBrains/README.md`.
 
-### Phase 3 — Eclipse plugin (Java, Tycho/OSGi) — 🚧 scaffolded, **not yet compiled**
+### Phase 3 — Eclipse plugin (Java, Tycho/OSGi) — 🚧 compiles & packages (verified 2026-07-26), **not yet run in a live Eclipse instance**
 Written on the same machine, confirmed to also have no local Maven — same
 caveat as Phase 2. See `extensions/eclipse/README.md` for the full status and
 what to check first (target-platform resolution and Tycho version drift are

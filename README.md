@@ -82,12 +82,12 @@ npm run watch          # rebuilds on change
 
 ## JetBrains IDEs
 
-> 🚧 *In development — scaffolded, not yet compiled.* The plugin code is
-> written (one plugin covers all IntelliJ-Platform IDEs: IntelliJ IDEA,
-> PyCharm, WebStorm, GoLand, RubyMine, CLion, Rider, …) but has not been built
-> against a real JDK/Gradle yet. See
-> [`extensions/JetBrains/README.md`](extensions/JetBrains/README.md) for the full
-> status and what to check first.
+> 🚧 *In development — compiles and packages cleanly, not yet run in a
+> sandbox IDE.* The plugin code is written (one plugin covers all
+> IntelliJ-Platform IDEs: IntelliJ IDEA, PyCharm, WebStorm, GoLand, RubyMine,
+> CLion, Rider, …) and has been built for real against a JDK 21/Gradle 9.6.1
+> toolchain. See [`extensions/JetBrains/README.md`](extensions/JetBrains/README.md)
+> for the full status and what's still unverified.
 
 **Build from source (current):**
 ```bash
@@ -96,8 +96,9 @@ npm install
 npm run build:sidecar -w @xprei/core
 
 cd extensions/JetBrains
-gradle wrapper --gradle-version 8.10   # generates gradlew (not committed, see extensions/JetBrains/README.md)
-./gradlew buildPlugin                   # output: build/distributions/xpreiIDE-*.zip
+gradle buildPlugin                      # output: build/distributions/xpreiIDE-*.zip
+# no local Gradle? run `gradle wrapper --gradle-version 8.10` first (see
+# extensions/JetBrains/README.md) to generate ./gradlew
 ```
 Then in the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → select the
 built `.zip` → restart.
@@ -119,11 +120,11 @@ cd extensions/JetBrains
 
 ## Eclipse
 
-> 🚧 *In development — scaffolded, not yet compiled.* Same status as the
-> JetBrains plugin: the code is written but has not been built against a real
-> Maven/Tycho toolchain yet. See
-> [`extensions/eclipse/README.md`](extensions/eclipse/README.md) for the full
-> status and what to check first.
+> 🚧 *In development — compiles and packages cleanly, not yet run in a live
+> Eclipse instance.* Same status as the JetBrains plugin: the code is
+> written and has been built for real against a JDK 21/Maven 3.9.16/Tycho
+> 5.0.2 toolchain. See [`extensions/eclipse/README.md`](extensions/eclipse/README.md)
+> for the full status and what's still unverified.
 
 **Build from source (current):**
 ```bash

@@ -22,7 +22,6 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.3")
-        instrumentationTools()
     }
     implementation("com.google.code.gson:gson:2.11.0")
 }
@@ -69,10 +68,17 @@ sourceSets {
 // Runs the core's esbuild bundle step (npm run build:sidecar) so the plugin
 // always ships a fresh sidecar.cjs. Requires Node.js on PATH at BUILD time
 // (separate from the Node.js >= 18 requirement at RUNTIME on the end user's
-// machine — see README.md).
+// machine — see README.md). npm resolves to npm.cmd on Windows, which
+// Gradle's Exec task cannot invoke directly (ProcessBuilder doesn't consult
+// PATHEXT) — shell out through cmd /c there; other OSes invoke npm directly.
+val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 val buildSidecar = tasks.register<Exec>("buildSidecar") {
     workingDir = repoRoot
-    commandLine("npm", "run", "build:sidecar", "--workspace", "@xprei/core")
+    if (isWindows) {
+        commandLine("cmd", "/c", "npm", "run", "build:sidecar", "--workspace", "@xprei/core")
+    } else {
+        commandLine("npm", "run", "build:sidecar", "--workspace", "@xprei/core")
+    }
     inputs.dir(File(coreDir, "src"))
     outputs.file(sidecarBundle)
 }

@@ -1,38 +1,49 @@
 # xpreiIDE — JetBrains plugin
 
-## ⚠️ Status: written, NOT compiled or run
+## ⚠️ Status: compiles and packages cleanly (verified 2026-07-26), NOT yet run in a live sandbox IDE
 
-This plugin was scaffolded on a machine with **no JDK, no Gradle** installed
-(confirmed: `java`, `javac`, `gradle` all absent from PATH, no JetBrains
-Toolbox-installed IDE with a bundled JBR found). Every other piece of this
-repo (the VS Code extension, `@xprei/core`, the sidecar) was built with real
-tests passing on real runs — this plugin is different: **nobody has run
-`./gradlew build` against it yet.** Treat it as a well-researched first draft,
-not working code, until that happens.
+This plugin was originally scaffolded on a machine with no JDK/Gradle
+installed and was unverified. It has since been built for real (JDK 21,
+Gradle 9.6.1): `gradle build` and `gradle buildPlugin` both succeed,
+producing a real installable `xpreiIDE-intellij-0.0.1.zip`. Two real bugs
+were found and fixed in the process (see "Bugs found by the first real
+build" below). What's still unverified: actually loading the plugin in a
+sandbox IDE (`gradle runIde`) and exercising its runtime behavior (JCEF
+webview, PasswordSafe, the sidecar process) — the Kotlin compiles and
+type-checks, but no one has clicked through the chat panel yet.
 
 ### What to do first
 
 ```bash
-# from extensions/JetBrains, with a JDK 17+ on PATH:
-gradle wrapper --gradle-version 8.10   # generates gradlew/gradlew.bat (not committed — see below)
-./gradlew build                         # compiles Kotlin, catches real errors
-./gradlew runIde                        # launches a sandbox IDE with the plugin loaded
+# from extensions/JetBrains, with a JDK 17+ and Gradle on PATH:
+gradle build                            # compiles Kotlin, packages the plugin
+gradle buildPlugin                      # produces build/distributions/xpreiIDE-intellij-*.zip
+gradle runIde                           # launches a sandbox IDE with the plugin loaded — NOT yet tried
 ```
 
-If `./gradlew build` fails, that's expected the first time — work through the
-errors. The most likely failure classes, in order of likelihood:
+A Gradle wrapper isn't committed (see below) — either generate one
+(`gradle wrapper --gradle-version 8.10`) or use a system Gradle install
+directly, as above.
 
-1. **API drift.** The Gradle IntelliJ Platform Plugin DSL and JCEF/PasswordSafe
-   APIs were grounded against web search results at the time of writing (see
-   inline comments citing what was checked), not a local SDK — a method name,
-   package, or DSL property may have moved.
-2. **The `buildSidecar` Gradle `Exec` task** (in `build.gradle.kts`) shells out
-   to `npm run build:sidecar --workspace @xprei/core` from the repo root. If
-   `npm`/`node` aren't on the PATH Gradle sees, this fails — run
-   `npm run build:sidecar -w @xprei/core` manually first to isolate that from
-   any real Gradle/Kotlin issue.
-3. **Gradle wrapper isn't committed** (see below) — you need a system Gradle
-   install for the very first `gradle wrapper` invocation.
+### Bugs found by the first real build (fixed)
+
+1. **`instrumentationTools()` — unresolved reference.** This method, part of
+   the `dependencies { intellijPlatform { ... } }` DSL in earlier IntelliJ
+   Platform Gradle Plugin 2.x releases, no longer exists in 2.18.1 (the
+   pinned version) — removed from `build.gradle.kts`; instrumentation is
+   handled automatically now.
+2. **`buildSidecar`'s `Exec` task failed to invoke `npm` on Windows** — `npm`
+   resolves to `npm.cmd`, which Gradle's `Exec`/`ProcessBuilder` can't run
+   directly (it doesn't consult `PATHEXT`). Fixed by shelling through
+   `cmd /c` on Windows, direct invocation elsewhere (`build.gradle.kts`
+   detects `os.name`).
+
+### Remaining risk (not yet exercised)
+
+1. **API drift for JCEF/PasswordSafe.** Those APIs were grounded against web
+   search results at write time (see inline comments citing what was
+   checked), not exercised at runtime yet — `gradle runIde` is what would
+   catch a stale method name here, and hasn't been run.
 
 ### Why no Gradle wrapper is checked in
 
