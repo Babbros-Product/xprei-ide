@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { ChatChunk, ChatRequest, Provider } from "../providers/provider";
 import { FakeHost } from "./_fakehost";
 import { Agent, AgentEvents, Approver } from "./orchestrator";
-import { Tool } from "./tools";
+import { PendingEdit } from "./pendingEditOverlay";
+import { Tool, TOOLS } from "./tools";
 
 // Provider that replays a fixed script of assistant turns, one per chatStream call.
 class ScriptedProvider implements Provider {
@@ -267,4 +268,147 @@ test("a tool in deps.tools but NOT in the static TOOLS array is callable", async
   });
   await agent.run("task");
   assert.ok(log.includes("obs:echoed"));
+});
+
+test("file writes are buffered: onBatch decides, rejected file never lands", async () => {
+  const host = new FakeHost();
+  const { events } = recorder();
+  let batchEntries: PendingEdit[] = [];
+  events.onBatch = async (entries) => {
+    batchEntries = entries;
+    return entries.map((e) => ({ path: e.path, accept: e.path === "keep.ts" }));
+  };
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      '{"tool":"create_file","args":{"path":"keep.ts","content":"K"}}',
+      '{"tool":"create_file","args":{"path":"drop.ts","content":"D"}}',
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+  });
+  await agent.run("make files");
+  assert.deepEqual(batchEntries.map((e) => e.path).sort(), ["drop.ts", "keep.ts"]);
+  assert.equal(host.files.get("keep.ts"), "K");
+  assert.equal(host.files.has("drop.ts"), false);
+});
+
+test("onEdit fires only for accepted entries, at flush time, from PendingEdit content", async () => {
+  const host = new FakeHost({ "a.ts": "old" });
+  const { events } = recorder();
+  const edits: { path: string; before: string; after: string }[] = [];
+  events.onEdit = (path, before, after) => edits.push({ path, before, after });
+  events.onBatch = async (entries) =>
+    entries.map((e) => ({ path: e.path, accept: e.path === "a.ts" }));
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      '{"tool":"edit_file","args":{"path":"a.ts","find":"old","replace":"new"}}',
+      '{"tool":"create_file","args":{"path":"b.ts","content":"B"}}',
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+  });
+  await agent.run("edit");
+  assert.deepEqual(edits, [{ path: "a.ts", before: "old", after: "new" }]);
+});
+
+test("run_terminal flushes pending edits to real disk before the command executes", async () => {
+  class TerminalHost extends FakeHost {
+    sawContent: string | undefined;
+    async exec(command: string) {
+      this.sawContent = this.files.get("a.txt");
+      return super.exec(command);
+    }
+  }
+  const host = new TerminalHost();
+  const { events } = recorder();
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      '{"tool":"create_file","args":{"path":"a.txt","content":"hello"}}',
+      '{"tool":"run_terminal","args":{"command":"cat a.txt"}}',
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+  });
+  await agent.run("go");
+  assert.equal(host.sawContent, "hello");
+});
+
+test("an mcp__-prefixed tool also flushes pending edits before executing", async () => {
+  const host = new FakeHost();
+  let sawOnDisk: boolean | undefined;
+  const mcpTool: Tool = {
+    name: "mcp__srv__probe",
+    description: "test",
+    args: "{}",
+    mutating: true,
+    async run() {
+      sawOnDisk = host.files.has("x.ts");
+      return { observation: "ok" };
+    },
+  };
+  const { events } = recorder();
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      '{"tool":"create_file","args":{"path":"x.ts","content":"X"}}',
+      '{"tool":"mcp__srv__probe","args":{}}',
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+    tools: [...TOOLS, mcpTool],
+  });
+  await agent.run("go");
+  assert.equal(sawOnDisk, true);
+});
+
+test("onBatch receives only edits still pending after a mid-run terminal flush", async () => {
+  const host = new FakeHost();
+  const { events } = recorder();
+  let batchPaths: string[] = [];
+  events.onBatch = async (entries) => {
+    batchPaths = entries.map((e) => e.path);
+    return entries.map((e) => ({ path: e.path, accept: true }));
+  };
+  const agent = new Agent({
+    provider: new ScriptedProvider([
+      '{"tool":"create_file","args":{"path":"early.ts","content":"E"}}',
+      '{"tool":"run_terminal","args":{"command":"true"}}',
+      '{"tool":"create_file","args":{"path":"late.ts","content":"L"}}',
+      '{"final":"done"}',
+    ]),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+  });
+  await agent.run("go");
+  assert.deepEqual(batchPaths, ["late.ts"]);
+  assert.equal(host.files.get("early.ts"), "E");
+  assert.equal(host.files.get("late.ts"), "L");
+});
+
+test("maxSteps exhaustion settles the batch like final (missing onBatch = accept all)", async () => {
+  const host = new FakeHost();
+  const { events } = recorder();
+  const agent = new Agent({
+    provider: new ScriptedProvider(['{"tool":"create_file","args":{"path":"s.ts","content":"S"}}']),
+    model: "m",
+    host,
+    approver: yes,
+    events,
+    maxSteps: 1,
+  });
+  await agent.run("go");
+  assert.equal(host.files.get("s.ts"), "S");
 });

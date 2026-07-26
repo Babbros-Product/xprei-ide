@@ -10,6 +10,7 @@
 import { ChatMessage, Provider } from "../providers/provider";
 import { Checkpoint } from "./checkpoint";
 import { AgentHost } from "./host";
+import { PendingEdit, PendingEditOverlay } from "./pendingEditOverlay";
 import { Action, buildAgentSystemPrompt, parseAction } from "./protocol";
 import { Tool, TOOLS } from "./tools";
 
@@ -27,6 +28,16 @@ export interface AgentEvents {
   // content for editor-side feedback (e.g. a gutter flash). Optional so
   // headless/test callers don't need to implement it.
   onEdit?(path: string, before: string, after: string): void;
+  // Fired once at end-of-run (final or maxSteps exhaustion) when file
+  // edits are still pending: the host UI shows a batch review and
+  // resolves per-file decisions. Optional — when absent, every pending
+  // edit is accepted (keeps headless tests and the sidecar unchanged).
+  onBatch?(entries: PendingEdit[]): Promise<BatchDecision[]>;
+}
+
+export interface BatchDecision {
+  path: string;
+  accept: boolean;
 }
 
 export interface Approver {
@@ -77,6 +88,9 @@ export class Agent {
     const unlimited = maxSteps <= 0;
     const protocolRetries = this.deps.protocolRetries ?? DEFAULT_PROTOCOL_RETRIES;
     let protocolFailures = 0;
+    // Fresh overlay per run: file writes buffer here and land on disk
+    // only at a pre-terminal flush or the end-of-run batch review.
+    const overlay = new PendingEditOverlay(this.deps.host);
 
     for (let step = 1; unlimited || step <= maxSteps; step++) {
       if (signal?.aborted) return;
@@ -112,23 +126,28 @@ export class Agent {
       protocolFailures = 0;
 
       if (action.kind === "final") {
+        await this.settleBatch(overlay);
         this.deps.events.onFinal(action.text);
         return;
       }
 
-      const observation = await this.runTool(action);
+      const observation = await this.runTool(action, overlay);
       this.deps.events.onObservation(observation);
       // Feed the result back as the next user turn (universal across models;
       // avoids relying on a "tool" role many OSS backends ignore).
       messages.push({ role: "user", content: `Observation:\n${observation}` });
     }
 
+    await this.settleBatch(overlay);
     this.deps.events.onFinal(
       `Stopped after ${maxSteps} steps without finishing. Refine the task or raise xpreiIDE.agent.maxSteps.`,
     );
   }
 
-  private async runTool(action: Extract<Action, { kind: "tool" }>): Promise<string> {
+  private async runTool(
+    action: Extract<Action, { kind: "tool" }>,
+    overlay: PendingEditOverlay,
+  ): Promise<string> {
     const tool = this.tools.find((t) => t.name === action.tool);
     if (!tool) {
       return `Error: unknown tool "${action.tool}". Available: ${this.tools
@@ -137,25 +156,72 @@ export class Agent {
     }
     this.deps.events.onTool(tool.name, action.args);
 
+    // Tools that touch the real world outside the AgentHost seam must
+    // see consistent real files — flush pending edits first. These edits
+    // were each already individually approved at their own step; only
+    // the write was deferred. (run_terminal per the spec; mcp__* is a
+    // deliberate extension for the same reason.)
+    let flushWarning: string | undefined;
+    if (tool.name === "run_terminal" || tool.name.startsWith("mcp__")) {
+      flushWarning = await this.flushPending(overlay);
+    }
+
     if (tool.mutating) {
       const ok = await this.deps.approver.approve(tool, action.args);
       if (!ok) return "User rejected this action. Choose a different step.";
-      // Snapshot the target path before the write so the run stays revertible
-      // — also the "before" half of the post-write diff for editor feedback.
-      const path = typeof action.args.path === "string" ? action.args.path : undefined;
-      if (path) await this.checkpoint.note(path);
     }
 
     try {
-      const result = await tool.run(action.args, this.deps.host);
-      if (tool.mutating && result.wrote && this.deps.events.onEdit) {
-        const before = this.checkpoint.getSnapshot(result.wrote)?.content ?? "";
-        const after = await this.deps.host.readFile(result.wrote).catch(() => "");
-        this.deps.events.onEdit(result.wrote, before, after);
-      }
-      return result.observation;
+      const result = await tool.run(action.args, overlay);
+      return flushWarning ? `${flushWarning}\n${result.observation}` : result.observation;
     } catch (err) {
       return `Error running ${tool.name}: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // Checkpoint-note + flush every pending edit (pre-terminal/MCP flush
+  // site). Returns a warning line when any entry failed to write, else
+  // undefined. note() reads the REAL host, which the buffered write
+  // hasn't touched yet, so noting here still captures pre-run content
+  // (first-snapshot-wins makes repeats harmless).
+  private async flushPending(overlay: PendingEditOverlay): Promise<string | undefined> {
+    const pending = overlay.pending;
+    if (pending.length === 0) return undefined;
+    for (const e of pending) await this.checkpoint.note(e.path);
+    const { flushed, failed } = await overlay.flush();
+    for (const f of flushed) this.deps.events.onEdit?.(f.path, f.before, f.after);
+    if (failed.length > 0) {
+      return `Warning: failed to write pending edit(s): ${failed
+        .map((f) => `${f.path} (${f.error})`)
+        .join(", ")}`;
+    }
+    return undefined;
+  }
+
+  // End-of-run batch review: ask onBatch (or accept everything when the
+  // host doesn't implement it), then flush accepted entries and discard
+  // rejected ones. Paths missing from the decisions are treated as
+  // rejected (defensive).
+  private async settleBatch(overlay: PendingEditOverlay): Promise<void> {
+    const pending = overlay.pending;
+    if (pending.length === 0) return;
+    const decisions = this.deps.events.onBatch
+      ? await this.deps.events.onBatch(pending)
+      : pending.map((e) => ({ path: e.path, accept: true }));
+    const accepted = new Set(decisions.filter((d) => d.accept).map((d) => d.path));
+    for (const entry of pending) {
+      if (!accepted.has(entry.path)) {
+        overlay.discard(entry.path);
+        continue;
+      }
+      await this.checkpoint.note(entry.path);
+      const { flushed, failed } = await overlay.flush(entry.path);
+      for (const f of flushed) this.deps.events.onEdit?.(f.path, f.before, f.after);
+      if (failed.length > 0) {
+        this.deps.events.onError(
+          `Failed to write accepted edit(s): ${failed.map((f) => `${f.path} (${f.error})`).join(", ")}`,
+        );
+      }
     }
   }
 
