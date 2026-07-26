@@ -134,3 +134,49 @@ test("ollama embed returns [] for empty input without hitting the network", asyn
     restore();
   }
 });
+
+test("ollama fillInMiddle sends stream:false with prompt/suffix and returns the response field", async () => {
+  let capturedBody: unknown;
+  const restore = mockFetch(async (_url, init) => {
+    capturedBody = JSON.parse(String(init?.body));
+    return jsonResponse({ response: "console.log('mid');" });
+  });
+  try {
+    const out = await new OllamaProvider(cfg).fillInMiddle("const x = ", ";", "codellama:7b");
+    assert.equal(out, "console.log('mid');");
+    assert.deepEqual(capturedBody, {
+      model: "codellama:7b",
+      prompt: "const x = ",
+      suffix: ";",
+      stream: false,
+    });
+  } finally {
+    restore();
+  }
+});
+
+test("ollama fillInMiddle throws ProviderError with the response body on a non-OK response", async () => {
+  const restore = mockFetch(async () => jsonResponse({ error: "model not found" }, { status: 404 }));
+  try {
+    await assert.rejects(
+      () => new OllamaProvider(cfg).fillInMiddle("prefix", "suffix", "codellama:7b"),
+      (e) => e instanceof ProviderError && /404/.test(e.message),
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("ollama fillInMiddle rethrows AbortError unwrapped", async () => {
+  const restore = mockFetch(async () => {
+    throw abortError();
+  });
+  try {
+    await assert.rejects(
+      () => new OllamaProvider(cfg).fillInMiddle("prefix", "suffix", "codellama:7b"),
+      (e) => isAbortError(e),
+    );
+  } finally {
+    restore();
+  }
+});

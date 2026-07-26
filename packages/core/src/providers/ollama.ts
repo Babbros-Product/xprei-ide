@@ -98,6 +98,29 @@ export class OllamaProvider implements Provider {
     }
   }
 
+  async fillInMiddle(prefix: string, suffix: string, model: string, signal?: AbortSignal): Promise<string> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify({ model, prompt: prefix, suffix, stream: false }),
+      });
+    } catch (err) {
+      if (isAbortError(err)) throw err;
+      throw new ProviderError(this.unreachable(), err);
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new ProviderError(
+        `Ollama /api/generate failed: ${res.status} ${res.statusText} ${body}`.trim(),
+      );
+    }
+    const data = (await res.json()) as { response?: string };
+    return data.response ?? "";
+  }
+
   async embed(texts: string[], model: string, signal?: AbortSignal): Promise<number[][]> {
     if (texts.length === 0) return [];
     // Prefer the batch endpoint (/api/embed, Ollama >= 0.1.x): one round-trip

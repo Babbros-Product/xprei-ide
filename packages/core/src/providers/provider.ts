@@ -44,6 +44,13 @@ export interface Provider {
 
   // Optional: produce embeddings for the RAG layer (P2).
   embed?(texts: string[], model: string, signal?: AbortSignal): Promise<number[][]>;
+
+  // Real fill-in-the-middle completion: given the text before and after
+  // the cursor, returns the text to insert. Optional — only providers
+  // with a native FIM endpoint implement this; callers check for its
+  // presence (and, separately, isFimCapableModel(model)) before using
+  // it.
+  fillInMiddle?(prefix: string, suffix: string, model: string, signal?: AbortSignal): Promise<string>;
 }
 
 // Config entry persisted in settings (xpreiIDE.providers).
