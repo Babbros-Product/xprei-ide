@@ -10,6 +10,7 @@ import { ChatMessage, isAbortError, ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "../../providers/registry";
 import { uniqueProviderId } from "@xprei/core";
 import { loadProjectRules } from "../../context/projectRules";
+import { loadConfig, saveConfig } from "../../config/configStore";
 
 // Plan mode has no file-editing tools at all (plain chat), so the model is
 // told explicitly not to claim it changed anything — Edit/Agent modes get
@@ -253,15 +254,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async onSelectModel(pointer: string): Promise<void> {
     if (!pointer) return;
-    await vscode.workspace
-      .getConfiguration("xpreiIDE")
-      .update("activeModel", pointer, vscode.ConfigurationTarget.Global);
+    const { config, raw } = await loadConfig();
+    config.activeModel = pointer;
+    await saveConfig(config, raw);
     await this.sendModels();
   }
 
   // Push the full provider config list (no secrets) to the settings panel.
   private async sendProviders(): Promise<void> {
-    this.post({ type: "providers", items: this.registry.getConfigs() });
+    this.post({ type: "providers", items: await this.registry.getConfigs() });
   }
 
   // Settings-panel "Save provider": validate, assign a unique id, persist
@@ -280,7 +281,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const existing = this.registry.getConfigs();
+    const existing = await this.registry.getConfigs();
     const id = uniqueProviderId(
       slugify(label, kind),
       existing.map((c) => c.id),
