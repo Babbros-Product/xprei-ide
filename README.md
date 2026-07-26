@@ -201,7 +201,9 @@ configuration (runtime workbench).
   Fix / Tests / Comments / Refactor — also available as `/slash` commands
   in chat).
 - **Project rules** — a `.xpreiIDErules` file at your workspace root is injected
-  into every prompt.
+  into every prompt, plus modular `.xpreiIDE/rules/*.md` files that can be
+  scoped to matching files via frontmatter (`globs: *.tsx, src/**`), and
+  `.xpreiIDE/prompts/*.md` files that become your own `/name` slash commands.
 - **Ignore file** — a `.xpreiIDEignore` file (`.gitignore`-lite syntax)
   excludes extra paths from the codebase index, on top of the built-in
   exclusions.

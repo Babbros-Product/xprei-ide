@@ -14,7 +14,7 @@ on stock VS Code.
 - [Chat modes: Plan, Edit, Agent](#chat-modes-plan-edit-agent)
 - [Working with chat](#working-with-chat)
 - [Bringing in context (@mentions)](#bringing-in-context-mentions)
-- [Project instructions & ignore file](#project-instructions--ignore-file)
+- [Project instructions, rules & prompt files](#project-instructions-rules--prompt-files)
 - [The Agent, in depth](#the-agent-in-depth)
 - [MCP servers](#mcp-servers)
 - [Inline edit (Cmd-K)](#inline-edit-cmd-k)
@@ -150,7 +150,9 @@ to do with your message:
 - **Slash commands.** Typing `/explain`, `/fix`, `/tests`, `/comments`, or
   `/refactor` at the start of a message expands it into a full prompt for
   that quick action before sending — the same five actions available via
-  right-click (see [Quick actions](#quick-actions)).
+  right-click (see [Quick actions](#quick-actions)). You can add your own:
+  see `.xpreiIDE/prompts/*.md` under
+  [Project instructions, rules & prompt files](#project-instructions-rules--prompt-files).
 
 ## Bringing in context (@mentions)
 
@@ -214,15 +216,38 @@ xpreiIDE automatically trims it to fit your model's context window,
 prioritizing explicit requests (`@file:`, `@url:`, …) over broader/lower-
 confidence ones (`@codebase` search hits).
 
-## Project instructions & ignore file
+## Project instructions, rules & prompt files
 
-Two optional dotfiles at your workspace root, both read fresh every time
-they're needed — no caching, no reload required:
+Optional dotfiles at your workspace root, all read fresh every time
+they're needed — no caching, no reload required (except prompt files,
+noted below):
 
 - **`.xpreiIDErules`** — plain text, injected into every chat/edit/agent
   prompt as extra project-specific instructions (coding conventions, "we
   use tabs not spaces", "always write tests", whatever's useful to remind
   the model of on every request).
+- **`.xpreiIDE/rules/*.md`** — modular rule files, one concern per file.
+  Optional frontmatter scopes a rule to matching files:
+  ```markdown
+  ---
+  globs: *.tsx, src/components/**
+  ---
+  Use functional React components. Style with Tailwind only.
+  ```
+  Same glob syntax as `.xpreiIDEignore` below. No frontmatter (or no
+  `globs:` line) means the rule always applies — a modular way to split
+  up a large `.xpreiIDErules` without scoping it. A rule with `globs:`
+  applies only when the **active editor's** file matches — there's no
+  active editor open, it doesn't apply (global rules still do). Merge
+  order: `.xpreiIDErules` first, then applicable rule files in filename
+  order.
+- **`.xpreiIDE/prompts/*.md`** — turn a file into your own slash command:
+  `review.md` becomes `/review` in the chat composer, expanding exactly
+  like the built-in `/explain`, `/fix`, etc. Typed text after the command
+  is appended to the file's content (`/review check for race conditions`
+  sends the file plus that extra line). Built-in commands win name
+  collisions. **Edits require reopening the chat panel** to pick up — no
+  file watcher in this version.
 - **`.xpreiIDEignore`** — one pattern per line, `.gitignore`-style syntax
   (`#` comments, blank lines ignored, `*` within a path segment, `**`
   across segments, a pattern containing `/` anchors to the workspace
