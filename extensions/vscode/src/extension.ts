@@ -10,6 +10,7 @@ import { tryAutoDiscoverOllama } from "./providers/autoDiscover";
 import { ChatViewProvider, QuickActionKind } from "./ui/chat/chatView";
 import { generateCommitMessage } from "./git/commitMessage";
 import { InlineCompletionProvider } from "./completion/inlineCompletionProvider";
+import { loadConfig, saveConfig } from "./config/configStore";
 
 const QUICK_ACTIONS: { kind: QuickActionKind; command: string }[] = [
   { kind: "explain", command: "xpreiIDE.explainSelection" },
@@ -188,17 +189,17 @@ async function selectModel(
   role: string,
   fallbackSetting?: "activeModel",
 ): Promise<void> {
-  const configs = registry.getConfigs();
+  const configs = await registry.getConfigs();
   if (configs.length === 0) {
     vscode.window.showWarningMessage(
-      "No providers configured. Add one under Settings → xpreiIDE.providers.",
+      "No providers configured. Add one via 'xpreiIDE: Add Provider'.",
     );
     return;
   }
 
   if (fallbackSetting) {
-    const raw = vscode.workspace.getConfiguration("xpreiIDE").get<string>(setting, "");
-    if (raw) {
+    const { config, raw } = await loadConfig();
+    if (config[setting]) {
       const chat = await registry.resolvePointer(fallbackSetting);
       const chatLabel = chat ? `${chat.provider.label}/${chat.model}` : "not set";
       const choice = await vscode.window.showQuickPick(
@@ -210,9 +211,8 @@ async function selectModel(
       );
       if (!choice) return;
       if (choice.action === "clear") {
-        await vscode.workspace
-          .getConfiguration("xpreiIDE")
-          .update(setting, "", vscode.ConfigurationTarget.Global);
+        config[setting] = "";
+        await saveConfig(config, raw);
         vscode.window.showInformationMessage(`xpreiIDE ${role} now follows the Chat model.`);
         return;
       }
@@ -248,13 +248,9 @@ async function selectModel(
   });
   if (!model) return;
 
-  await vscode.workspace
-    .getConfiguration("xpreiIDE")
-    .update(
-      setting,
-      ProviderRegistry.formatActive(pickedProvider.id, model),
-      vscode.ConfigurationTarget.Global,
-    );
+  const { config, raw } = await loadConfig();
+  config[setting] = ProviderRegistry.formatActive(pickedProvider.id, model);
+  await saveConfig(config, raw);
   vscode.window.showInformationMessage(
     `xpreiIDE ${role} model: ${pickedProvider.label} / ${model}`,
   );
@@ -281,7 +277,7 @@ async function rebuildIndex(engine: ContextEngine): Promise<void> {
 
 // Store an API key in SecretStorage for an OpenAI-compatible provider.
 async function setApiKey(registry: ProviderRegistry): Promise<void> {
-  const configs = registry.getConfigs().filter((c) => c.kind === "openai-compat");
+  const configs = (await registry.getConfigs()).filter((c) => c.kind === "openai-compat");
   if (configs.length === 0) {
     vscode.window.showWarningMessage(
       "No OpenAI-compatible providers configured. Ollama needs no key.",
