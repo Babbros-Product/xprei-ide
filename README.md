@@ -21,11 +21,14 @@ A **[Babbros](https://xprei.online)** product · [xprei.online](https://xprei.on
 | **Visual Studio Code** | ✅ Available | [Marketplace / `.vsix`](#visual-studio-code) |
 | **JetBrains** (IntelliJ IDEA, PyCharm, WebStorm, GoLand, …) | 🚧 In development | [Build from source](#jetbrains-ides) |
 | **Eclipse** | 🚧 In development | [Build from source](#eclipse) |
+| **CLI** (headless, for CI/no-IDE workflows) | ✅ Available | [`extensions/cli`](extensions/cli/README.md) |
 
 > JetBrains and Eclipse plugins share the same engine as the VS Code extension via
 > a bundled local core process — see [`docs/multi-ide-plan.md`](docs/multi-ide-plan.md)
 > for the architecture. The steps below marked *in development* describe the
-> intended flow; the plugins are being built now.
+> intended flow; the plugins are being built now. The CLI runs the same engine
+> directly in-process (no editor, no bundled sidecar) — see its own README for
+> `xprei agent`/`xprei chat` usage.
 
 ---
 
