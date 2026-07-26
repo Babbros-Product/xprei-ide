@@ -252,7 +252,7 @@ class XpreiHostBridge(private val project: Project, private val postToWebview: (
         sendRequest(
             "chat.send",
             obj("requestId" to requestId, "model" to pointer, "messages" to messages),
-        )
+        ) { resp -> handleRpcError(resp, requestId) { text -> postToWebview(obj("type" to "error", "text" to text)) } }
     }
 
     private fun runAgentTask(task: String, mode: String) {
@@ -267,7 +267,28 @@ class XpreiHostBridge(private val project: Project, private val postToWebview: (
         sendRequest(
             "agent.run",
             obj("requestId" to requestId, "model" to pointer, "task" to task, "mode" to mode),
-        )
+        ) { resp ->
+            handleRpcError(resp, requestId) { text ->
+                postToWebview(obj("type" to "agent", "kind" to "error", "text" to text))
+                postToWebview(obj("type" to "agent", "kind" to "end"))
+            }
+        }
+    }
+
+    // sendRequest's onResult only sees the RPC response (a synchronous
+    // accept/reject of the request itself — {"result":{"started":true}} or
+    // {"error":{message}}, per session.ts's respond()/respondError()).
+    // Streamed progress (chat.delta/chat.done/agent.final/etc.) arrives
+    // separately as notifications matched by requestId in
+    // handleSidecarEvent(). Without this check, a rejection (e.g.
+    // "unknown model") is silently dropped and inflightRequestId is never
+    // cleared, since only the notification handlers clear it — the
+    // composer stays busy forever with no error shown.
+    private fun handleRpcError(resp: JsonObject, requestId: String, onError: (String) -> Unit) {
+        val error = resp.getAsJsonObject("error") ?: return
+        if (inflightRequestId != requestId) return
+        inflightRequestId = null
+        onError(error.get("message")?.asString ?: "Request failed.")
     }
 
     // ---- Sidecar -> host -------------------------------------------------

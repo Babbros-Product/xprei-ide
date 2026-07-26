@@ -306,7 +306,8 @@ public final class XpreiHostBridge {
                 + "or modified a file; suggest switching to Edit or Agent mode for that."));
         for (String[] turn : history) messages.add(obj("role", turn[0], "content", turn[1]));
 
-        sendRequest("chat.send", obj("requestId", requestId, "model", pointer, "messages", messages), null);
+        sendRequest("chat.send", obj("requestId", requestId, "model", pointer, "messages", messages), resp ->
+            handleRpcError(resp, requestId, errText -> postToWebview.accept(obj("type", "error", "text", errText))));
     }
 
     private void runAgentTask(String task, String mode) {
@@ -318,7 +319,27 @@ public final class XpreiHostBridge {
         String requestId = "agent-" + requestSeq.getAndIncrement();
         inflightRequestId = requestId;
         postToWebview.accept(obj("type", "agent", "kind", "start"));
-        sendRequest("agent.run", obj("requestId", requestId, "model", pointer, "task", task, "mode", mode), null);
+        sendRequest("agent.run", obj("requestId", requestId, "model", pointer, "task", task, "mode", mode), resp ->
+            handleRpcError(resp, requestId, text -> {
+                postToWebview.accept(obj("type", "agent", "kind", "error", "text", text));
+                postToWebview.accept(obj("type", "agent", "kind", "end"));
+            }));
+    }
+
+    // sendRequest's callback only sees the RPC response (a synchronous
+    // accept/reject of the request itself — {"result":{"started":true}} or
+    // {"error":{message}}, per session.ts's respond()/respondError()).
+    // Streamed progress (chat.delta/chat.done/agent.final/etc.) arrives
+    // separately as notifications matched by requestId in
+    // handleSidecarEvent(). Without this check, a rejection (e.g.
+    // "unknown model") is silently dropped and inflightRequestId is never
+    // cleared, since only the notification handlers clear it — the
+    // composer stays busy forever with no error shown.
+    private void handleRpcError(Map<String, Object> resp, String requestId, Consumer<String> onError) {
+        Object error = resp.get("error");
+        if (error == null || !requestId.equals(inflightRequestId)) return;
+        inflightRequestId = null;
+        onError.accept(asStr(asObj(error).get("message"), "Request failed."));
     }
 
     // ---- Sidecar -> host ----
