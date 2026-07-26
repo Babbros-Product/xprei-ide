@@ -95,9 +95,10 @@ background) with Eclipse's own platform APIs:
 - **`SidecarProcess`** + **`WebviewResources`** — spawn the bundled
   `sidecar.cjs`, extract webview assets from plugin resources to temp files.
   Same Node.js ≥ 18-on-PATH runtime prerequisite as the IntelliJ plugin.
-- **`XpreiSettings`** (`InstanceScope` preferences, JSON-blob serialized —
-  Eclipse preferences only store flat values) + **`XpreiSecrets`**
-  (Equinox Secure Storage, `ISecurePreferences`) for config/keys.
+- **`XpreiSettings`** (reads/writes the shared `~/.xpreiide/config.yaml`
+  via the hand-rolled `XpreiYamlLite` codec — see "Config storage" below)
+  + **`XpreiSecrets`** (Equinox Secure Storage, `ISecurePreferences`) for
+  config/keys.
 
 ### MVP simplifications (same list as IntelliJ, plus one Eclipse-specific one)
 
@@ -112,6 +113,20 @@ background) with Eclipse's own platform APIs:
   refreshes every open project rather than tracking which project owns the
   written path (cheap for typical project counts, simplest correct MVP
   behavior — not necessarily the most efficient one).
+
+## Config storage: shared ~/.xpreiide/config.yaml
+
+`XpreiSettings`'s provider/active-model data no longer lives in
+Eclipse's own `InstanceScope` preferences JSON blob — it reads/writes
+`~/.xpreiide/config.yaml` directly, the same file the VS Code extension
+and the IntelliJ plugin use (see
+`docs/superpowers/specs/2026-07-26-phase6-shared-config-design.md`).
+`XpreiYamlLite.java` (new, in this package) is a hand-ported copy of
+`packages/core/src/config/yamlLite.ts`'s parser/serializer — plain Java,
+zero Eclipse/OSGi dependencies, same spirit as `MiniJson.java` above.
+Like the rest of this plugin, **this change has not been compiled or
+tested against a real JDK/Maven toolchain** — written and reviewed by
+inspection only.
 
 ## What IS verifiable already (do this before touching Java further)
 

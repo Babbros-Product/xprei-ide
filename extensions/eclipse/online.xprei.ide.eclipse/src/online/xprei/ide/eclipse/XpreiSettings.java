@@ -1,44 +1,72 @@
 package online.xprei.ide.eclipse;
 
-import org.eclipse.core.runtime.preferences.IEclipsePreferences;
-import org.eclipse.core.runtime.preferences.InstanceScope;
-
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.prefs.BackingStoreException;
 
-import static online.xprei.ide.eclipse.MiniJson.asArr;
-import static online.xprei.ide.eclipse.MiniJson.asObj;
 import static online.xprei.ide.eclipse.MiniJson.asStr;
 import static online.xprei.ide.eclipse.MiniJson.obj;
 
 /**
- * Non-secret provider config, persisted as a JSON blob in Eclipse's
- * InstanceScope preferences (application/workspace-global — matches VS
- * Code's ConfigurationTarget.Global and the JetBrains plugin's app-level
- * PersistentStateComponent). API keys are NEVER stored here — see
- * {@link XpreiSecrets} (Equinox Secure Storage). Preferences only store
- * flat string/int/bool values, not structured lists, hence the JSON-blob
- * serialization via {@link MiniJson}.
+ * Non-secret provider config, persisted in the shared
+ * ~/.xpreiide/config.yaml — the same file VS Code and the IntelliJ
+ * plugin read/write (see
+ * docs/superpowers/specs/2026-07-26-phase6-shared-config-design.md).
+ * Storage moved off Eclipse's own InstanceScope preferences JSON blob
+ * so provider/model config is shared across every host. API keys are
+ * NEVER stored here — see {@link XpreiSecrets} (Equinox Secure
+ * Storage). NOT compiled or tested in this environment (no local Maven
+ * available) — verify against a real Eclipse workspace before relying
+ * on it.
  */
 public final class XpreiSettings {
-    private static final String NODE = "online.xprei.ide.eclipse";
     private static final String KEY_PROVIDERS = "providers";
     private static final String KEY_ACTIVE_MODEL = "activeModel";
 
     private XpreiSettings() {}
 
-    private static IEclipsePreferences node() {
-        return InstanceScope.INSTANCE.getNode(NODE);
+    private static File configFile() {
+        return Paths.get(System.getProperty("user.home"), ".xpreiide", "config.yaml").toFile();
+    }
+
+    private static Map<String, Object> readRaw() {
+        File file = configFile();
+        if (!file.exists()) return new LinkedHashMap<>();
+        try {
+            String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+            return XpreiYamlLite.parse(content);
+        } catch (IOException e) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    private static void writeRaw(Map<String, Object> raw) {
+        File file = configFile();
+        file.getParentFile().mkdirs();
+        try {
+            Files.write(file.toPath(), XpreiYamlLite.stringify(raw).getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            // Best-effort persistence — matches this class's prior
+            // BackingStoreException handling: the caller already has the
+            // in-memory value it intended to persist, even if the
+            // on-disk write failed.
+        }
     }
 
     /** Each entry: {id, kind, label, baseUrl, model}. */
+    @SuppressWarnings("unchecked")
     public static List<Map<String, Object>> getProviders() {
-        String raw = node().get(KEY_PROVIDERS, "");
-        if (raw.isEmpty()) {
+        Map<String, Object> raw = readRaw();
+        Object providersRaw = raw.get(KEY_PROVIDERS);
+        if (!(providersRaw instanceof List)) {
             List<Map<String, Object>> defaults = new ArrayList<>();
             defaults.add(obj(
                 "id", "ollama-local",
@@ -48,15 +76,17 @@ public final class XpreiSettings {
                 "model", ""));
             return defaults;
         }
-        List<Object> parsed = asArr(MiniJson.parse(raw));
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Object o : parsed) out.add(asObj(o));
+        for (Object o : (List<Object>) providersRaw) {
+            if (o instanceof Map) out.add((Map<String, Object>) o);
+        }
         return out;
     }
 
     public static void setProviders(List<Map<String, Object>> providers) {
-        node().put(KEY_PROVIDERS, MiniJson.stringify(providers));
-        flush();
+        Map<String, Object> raw = readRaw();
+        raw.put(KEY_PROVIDERS, providers);
+        writeRaw(raw);
     }
 
     public static void addOrUpdate(Map<String, Object> cfg) {
@@ -80,21 +110,13 @@ public final class XpreiSettings {
     }
 
     public static String getActiveModel() {
-        return node().get(KEY_ACTIVE_MODEL, "");
+        Object v = readRaw().get(KEY_ACTIVE_MODEL);
+        return v instanceof String ? (String) v : "";
     }
 
     public static void setActiveModel(String pointer) {
-        node().put(KEY_ACTIVE_MODEL, pointer);
-        flush();
-    }
-
-    private static void flush() {
-        try {
-            node().flush();
-        } catch (BackingStoreException e) {
-            // Best-effort persistence — the in-memory node value (already
-            // updated by put()) is still correct for the rest of this
-            // session even if the on-disk write failed.
-        }
+        Map<String, Object> raw = readRaw();
+        raw.put(KEY_ACTIVE_MODEL, pointer);
+        writeRaw(raw);
     }
 }

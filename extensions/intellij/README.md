@@ -86,6 +86,20 @@ bundling a Node runtime per-plugin is a later fast-follow.
   commit-message generation.** All already scoped as fast-follows in the plan
   doc, not attempted here.
 
+## Config storage: shared ~/.xpreiide/config.yaml
+
+`XpreiSettingsState`'s provider/active-model data no longer lives in
+IntelliJ's own `PersistentStateComponent` XML storage — it reads/writes
+`~/.xpreiide/config.yaml` directly, the same file the VS Code extension
+and the Eclipse plugin use (see
+`docs/superpowers/specs/2026-07-26-phase6-shared-config-design.md`).
+`XpreiYamlLite` (in `XpreiSettingsState.kt`) is a hand-ported copy of
+`packages/core/src/config/yamlLite.ts`'s parser/serializer. Like the rest
+of this plugin, **this change has not been compiled or tested against a
+real JDK/Gradle toolchain** — it was written and reviewed by inspection
+only, following the same "well-researched first draft" status as
+everything else in this file.
+
 ## Explicit assumptions made without a compiler to check them
 
 Listed so a first debugging pass knows exactly where to look:
