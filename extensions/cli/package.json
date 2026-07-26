@@ -1,0 +1,21 @@
+{
+  "name": "xprei-cli",
+  "version": "0.0.1",
+  "description": "Headless CLI for xpreiIDE — one-shot agent/chat runs for CI or no-IDE workflows.",
+  "license": "MIT",
+  "bin": {
+    "xprei": "./dist/cli.cjs"
+  },
+  "scripts": {
+    "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.cjs --platform=node --format=cjs --target=node18",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/parseArgs.test.ts src/cliConfig.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@xprei/core": "*",
+    "esbuild": "^0.21.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0"
+  }
+}
