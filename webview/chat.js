@@ -576,6 +576,9 @@
       case "approval":
         addApprovalCard(msg.tool, msg.text, msg.before, msg.after);
         break;
+      case "batch":
+        addBatchCard(Array.isArray(msg.entries) ? msg.entries : []);
+        break;
       case "final":
         addMessage("assistant", msg.text, true);
         break;
@@ -650,6 +653,133 @@
     actions.appendChild(approveAllBtn);
     actions.appendChild(rejectBtn);
     el.appendChild(actions);
+
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // End-of-run batch review: one card, one section per pending file
+  // edit, each with its own Accept/Reject toggle (default accept), plus
+  // Accept all / Reject all shortcuts and a single Done submit. Reuses
+  // the approval card's CSS (.msg.agent-approval, .diffPreview).
+  var BATCH_CLIP = 2000;
+  function clipForDisplay(s) {
+    return s.length > BATCH_CLIP ? s.slice(0, BATCH_CLIP) + "\n… (truncated)" : s;
+  }
+
+  function addBatchCard(entries) {
+    const el = document.createElement("div");
+    el.className = "msg agent-approval";
+
+    const label = document.createElement("div");
+    label.className = "msgRole";
+    label.textContent =
+      "Review edits (" + entries.length + (entries.length === 1 ? " file)" : " files)");
+    el.appendChild(label);
+
+    const accept = {};
+    const rowCtrls = [];
+
+    entries.forEach((entry) => {
+      accept[entry.path] = true;
+
+      const section = document.createElement("div");
+      section.className = "msgBody";
+
+      const header = document.createElement("div");
+      let suffix = "";
+      if (entry.deleted) suffix = " (deleted)";
+      else if (!entry.existed) suffix = " (new file)";
+      header.textContent = entry.path + suffix;
+      header.style.fontWeight = "bold";
+      section.appendChild(header);
+
+      if (entry.existed && entry.before) {
+        const pre = document.createElement("pre");
+        pre.className = "diffPreview diffBefore";
+        pre.textContent = clipForDisplay(entry.before);
+        section.appendChild(pre);
+      }
+      if (!entry.deleted) {
+        const pre = document.createElement("pre");
+        pre.className = "diffPreview diffAfter";
+        pre.textContent = clipForDisplay(entry.after);
+        section.appendChild(pre);
+      }
+
+      const row = document.createElement("div");
+      row.className = "approvalActions";
+      const acceptBtn = document.createElement("button");
+      acceptBtn.type = "button";
+      const rejectBtn = document.createElement("button");
+      rejectBtn.type = "button";
+      acceptBtn.textContent = "Accept";
+      rejectBtn.textContent = "Reject";
+      function paint() {
+        acceptBtn.className = accept[entry.path] ? "primary" : "ghostBtn";
+        rejectBtn.className = accept[entry.path] ? "ghostBtn" : "primary";
+      }
+      acceptBtn.addEventListener("click", () => {
+        accept[entry.path] = true;
+        paint();
+      });
+      rejectBtn.addEventListener("click", () => {
+        accept[entry.path] = false;
+        paint();
+      });
+      paint();
+      rowCtrls.push({ path: entry.path, paint });
+      row.appendChild(acceptBtn);
+      row.appendChild(rejectBtn);
+      section.appendChild(row);
+      el.appendChild(section);
+    });
+
+    const footer = document.createElement("div");
+    footer.className = "approvalActions";
+
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.textContent = "Accept all";
+    allBtn.addEventListener("click", () => {
+      rowCtrls.forEach((c) => {
+        accept[c.path] = true;
+        c.paint();
+      });
+    });
+
+    const noneBtn = document.createElement("button");
+    noneBtn.type = "button";
+    noneBtn.className = "ghostBtn";
+    noneBtn.textContent = "Reject all";
+    noneBtn.addEventListener("click", () => {
+      rowCtrls.forEach((c) => {
+        accept[c.path] = false;
+        c.paint();
+      });
+    });
+
+    const doneBtn = document.createElement("button");
+    doneBtn.type = "button";
+    doneBtn.className = "primary";
+    doneBtn.textContent = "Done";
+    doneBtn.addEventListener("click", () => {
+      el.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      const kept = entries.filter((e) => accept[e.path]).length;
+      const status = document.createElement("div");
+      status.className = "approvalStatus";
+      status.textContent = "Applied " + kept + " of " + entries.length + ".";
+      el.appendChild(status);
+      vscode.postMessage({
+        type: "batchResponse",
+        decisions: entries.map((e) => ({ path: e.path, accept: !!accept[e.path] })),
+      });
+    });
+
+    footer.appendChild(allBtn);
+    footer.appendChild(noneBtn);
+    footer.appendChild(doneBtn);
+    el.appendChild(footer);
 
     messagesEl.appendChild(el);
     messagesEl.scrollTop = messagesEl.scrollHeight;
