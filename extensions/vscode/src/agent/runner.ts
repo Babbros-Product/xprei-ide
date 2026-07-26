@@ -7,7 +7,9 @@ import { Agent, AgentEvents, Approver } from "@xprei/core";
 import { VscodeAgentHost } from "./host";
 import { Checkpoint } from "@xprei/core";
 import { Tool, TOOLS } from "@xprei/core";
+import { McpManager, McpServerConfig } from "@xprei/core";
 import { flashAgentEdit } from "./editDecorations";
+import { loadConfig } from "../config/configStore";
 
 export type AgentMode = "edit" | "agent";
 export type ApprovalChoice = "approve" | "approve-all" | "reject";
@@ -25,6 +27,30 @@ export type RequestApproval = (
 // run_terminal or view_diff (both spawn a subprocess) — so "Edit" can't run
 // arbitrary commands, only "Agent" can.
 const EDIT_MODE_TOOLS = TOOLS.filter((t) => t.name !== "run_terminal" && t.name !== "view_diff");
+
+// Reads mcpServers from the shared config file's raw preserved map (it's
+// not one of XpreiConfig's 7 typed fields — see Phase 6's
+// schema.ts/configStore.ts). Defensive: a malformed entry is dropped,
+// not thrown.
+function parseMcpServers(raw: unknown): Record<string, McpServerConfig> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, McpServerConfig> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const v = value as Record<string, unknown>;
+    const command = typeof v.command === "string" ? v.command : undefined;
+    if (!command) continue;
+    const args = Array.isArray(v.args) ? v.args.filter((a): a is string => typeof a === "string") : [];
+    const envEntries =
+      v.env && typeof v.env === "object"
+        ? Object.entries(v.env as Record<string, unknown>).filter(
+            (e): e is [string, string] => typeof e[1] === "string",
+          )
+        : [];
+    out[name] = { command, args, ...(envEntries.length ? { env: Object.fromEntries(envEntries) } : {}) };
+  }
+  return out;
+}
 
 // Approver backed by an inline chat-transcript prompt (Copilot/Claude-chat
 // style) instead of a blocking native modal. "Approve all" flips auto-approve
@@ -65,6 +91,12 @@ function summarize(tool: string, args: Record<string, unknown>): string {
     const edits = Array.isArray(args.edits) ? args.edits : [];
     return `Edit ${path} (${edits.length} edits)`;
   }
+  if (tool.startsWith("mcp__")) {
+    const parts = tool.split("__");
+    const server = parts[1] ?? "?";
+    const toolName = parts.slice(2).join("__") || "?";
+    return `MCP: ${toolName} (${server})`;
+  }
   return path;
 }
 
@@ -95,6 +127,9 @@ function buildDiffPreview(tool: string, args: Record<string, unknown>): Approval
       .join("\n");
     return { before: clip(before), after: clip(after) };
   }
+  // No meaningful before/after diff for arbitrary MCP tool arguments —
+  // falls through to the plain-summary approval card, same as any tool
+  // with no diff preview.
   return undefined;
 }
 
@@ -112,6 +147,7 @@ export async function runAgent(
   signal: AbortSignal,
   mode: AgentMode = "agent",
   requestApproval: RequestApproval,
+  mcpManager: McpManager,
   projectRules?: string,
 ): Promise<AgentRun> {
   const resolved = await registry.resolveAgent();
@@ -140,6 +176,15 @@ export async function runAgent(
       post({ type: "agent", kind: "protocolError", text: reason, attempt, maxAttempts }),
   };
 
+  let agentTools: Tool[];
+  if (mode === "edit") {
+    agentTools = EDIT_MODE_TOOLS;
+  } else {
+    const { raw } = await loadConfig();
+    const mcpTools = await mcpManager.getTools(parseMcpServers(raw.mcpServers));
+    agentTools = [...TOOLS, ...mcpTools];
+  }
+
   const agent = new Agent({
     provider: resolved.provider,
     model: resolved.model,
@@ -148,7 +193,7 @@ export async function runAgent(
     events,
     maxSteps,
     protocolRetries,
-    tools: mode === "edit" ? EDIT_MODE_TOOLS : TOOLS,
+    tools: agentTools,
     projectRules,
   });
 

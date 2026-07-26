@@ -6,7 +6,7 @@ import { Checkpoint } from "@xprei/core";
 import { AgentMode, ApprovalChoice, ApprovalDiff, runAgent } from "../../agent/runner";
 import { ContextEngine } from "../../context/contextEngine";
 import { parseMentions } from "@xprei/core";
-import { ChatMessage, isAbortError, ProviderConfig } from "@xprei/core";
+import { ChatMessage, isAbortError, McpManager, ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "../../providers/registry";
 import { uniqueProviderId } from "@xprei/core";
 import { loadProjectRules } from "../../context/projectRules";
@@ -82,6 +82,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly registry: ProviderRegistry,
     private readonly context: ContextEngine,
     private readonly workspaceState: vscode.Memento,
+    private readonly mcpManager: McpManager,
   ) {
     this.sessions = this.workspaceState.get<StoredSession[]>(SESSIONS_KEY, []);
     if (this.sessions.length === 0) this.sessions.push(newSession());
@@ -406,6 +407,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.inflight.signal,
         mode,
         (tool, summary, diff) => this.requestApproval(tool, summary, diff),
+        this.mcpManager,
         rules,
       );
       this.lastCheckpoint = run.checkpoint;

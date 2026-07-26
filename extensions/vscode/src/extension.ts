@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import { ContextEngine } from "./context/contextEngine";
 import { InlineEditController } from "./edit/inlineEdit";
-import { ProviderConfig } from "@xprei/core";
+import { McpManager, ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "./providers/registry";
 import { runAddProviderFlow } from "./providers/addProviderFlow";
 import { tryAutoDiscoverOllama } from "./providers/autoDiscover";
@@ -72,8 +72,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const registry = new ProviderRegistry(context.secrets);
   const log = vscode.window.createOutputChannel("xpreiIDE");
   const engine = new ContextEngine(registry, context.storageUri, log);
+  const mcpManager = new McpManager();
 
-  const chat = new ChatViewProvider(context.extensionUri, registry, engine, context.workspaceState);
+  const chat = new ChatViewProvider(context.extensionUri, registry, engine, context.workspaceState, mcpManager);
   const inlineEdit = new InlineEditController(registry);
 
   // Keep the index fresh as the user edits. Debounce per-path so a burst of
@@ -107,6 +108,7 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher,
     inlineEdit,
     chat,
+    mcpManager,
     vscode.languages.registerInlineCompletionItemProvider(
       // Real editable documents only — not diff views, output panels, the
       // settings editor, or other read-only/virtual schemes.
