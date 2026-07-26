@@ -221,10 +221,11 @@ configuration (runtime workbench).
 
 ```
 extensions/vscode/          # VS Code extension (package name "xpreiIDE-ai", available today)
-extensions/JetBrains/        # JetBrains plugin (in development)
-extensions/eclipse/         # Eclipse plugin (in development)
-packages/core/              # shared bring-your-own-model + agent core (in development)
-webview/                    # shared chat UI (in development)
+extensions/JetBrains/        # JetBrains plugin (compiles & packages, not yet run in a sandbox IDE)
+extensions/eclipse/         # Eclipse plugin (compiles & packages, not yet run in a live Eclipse instance)
+extensions/cli/             # xprei-cli — headless CLI, available today
+packages/core/              # shared bring-your-own-model + agent core (@xprei/core, powers every host)
+webview/                    # shared chat UI, reused by every host's chat panel
 docs/                       # design specs and the multi-IDE plan
 ```
 

@@ -44,19 +44,21 @@ Dropped 2026-07-25 in favor of shipping as a normal extension:
 npm-workspaces monorepo (root `package.json`, workspaces `packages/*` +
 `extensions/*`). The platform-neutral core was extracted from the extension in
 Phase 0 of the multi-IDE plan (see `docs/multi-ide-plan.md`) so it can be reused
-by future JetBrains/Eclipse plugins via a shared Node sidecar.
+by the JetBrains/Eclipse plugins and the CLI extension via a shared Node sidecar.
 
 ```
 packages/core/             # @xprei/core — platform-neutral, no vscode import
   src/providers/           # provider.ts, ollama.ts, openai-compat.ts, presets.ts, modelList.ts
-  src/context/             # chunking, vectorstore, retrieval, mentions, exclude, budget (RAG substrate)
+  src/context/             # chunking, vectorstore, retrieval, mentions, exclude, budget, ignoreFile,
+                           # rules (frontmatter glob-scoped rules), repomap, urlSafety, htmlStrip (RAG substrate)
   src/edit/                # prompt.ts (inline-edit prompt builder)
-  src/agent/               # protocol, tools, checkpoint, orchestrator, pathResolve, host (interface)
+  src/agent/               # protocol, tools, checkpoint, orchestrator, pendingEditOverlay
+                           # (batch-review buffering), pathResolve, host (interface)
   src/host/nodeHost.ts     # Node AgentHost impl (fs/exec) — the sidecar's file/exec layer
   src/server/              # session.ts (JSON-RPC session) + stdio.ts (entrypoint) — the sidecar
   src/index.ts             # barrel — the public API the extension imports (NOT server/stdio.ts,
                             # which has a top-level auto-start side effect; import it directly)
-  # ALL unit tests live here now (97, run: npm test -w @xprei/core)
+  # ALL unit tests live here now (301, run: npm test -w @xprei/core)
 extensions/vscode/    # the VS Code platform layer — imports @xprei/core
   src/providers/           # registry.ts, addProviderFlow.ts (config/secrets/QuickPick)
   src/context/             # contextEngine.ts, projectRules.ts (vscode.fs/index persistence)
@@ -75,6 +77,10 @@ extensions/eclipse/        # Eclipse plugin (Java/Tycho) — compiles and packag
                             # cleanly (verified 2026-07-26 with a real JDK 21/Maven
                             # 3.9.16); NOT yet run in a live Eclipse instance — see
                             # extensions/eclipse/README.md before touching this code
+extensions/cli/            # xprei-cli — headless CLI (Phase 9), one-shot agent/chat
+                            # runs for CI or no-IDE workflows; drives the same
+                            # @xprei/core sidecar as the VS Code extension, bundled
+                            # via esbuild to dist/cli.cjs (bin: `xprei`)
 webview/                    # shared chat UI (chat.js/css, icons) — host-agnostic, reused by
                             # the intellij/eclipse plugins. bridge.js is the transport shim:
                             # window.xprei = { postMessage, onMessage }, one contract, three hosts.
@@ -87,8 +93,8 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 - **P2 context/RAG** (@codebase/@file, dependency-free cosine store) — done
 - **P3 Cmd-K inline edit** (red/green diff, Enter/Esc) — done
 - **P4 agent loop** (tools, protocol, approvals, checkpoints) — done, `48b31ba`
-- **P5 polish** — in progress. Done: chat lives in an Activity Bar container
-  and opens automatically on startup; quick actions (Explain/Fix/Tests/Comments/
+- **P5 polish** — done. Chat lives in an Activity Bar container and opens
+  automatically on startup; quick actions (Explain/Fix/Tests/Comments/
   Refactor via right-click or `/slash` commands, seeded into chat); `.xpreiIDErules`
   project-instructions file; chat code-block actions (Copy/Insert/Apply);
   Edit & resend / Regenerate on the latest turn; named/persistent chat sessions
@@ -96,26 +102,41 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
   agent-written files get a brief gutter flash if open; inline chat (Ctrl+I);
   commit-message generation from the staged diff (SCM title button); ghost-text
   inline completions (ties up any configured model via `chatStream`, not a
-  dedicated FIM endpoint — quality is model-gated); weak-model protocol retry
+  dedicated FIM endpoint by default — see true FIM below, quality still
+  model-gated); weak-model protocol retry
   (`xpreiIDE.agent.protocolRetries`, default 2 — corrective reprompt + visible
   retry indicator instead of silently ending the run on unparseable output;
   design: `docs/superpowers/specs/2026-07-25-weak-model-protocol-retry-design.md`).
-  Still open: telemetry, diff-preview-before-apply for multi-file agent
-  runs (design spec written and approved:
-  `docs/superpowers/specs/2026-07-24-diff-preview-before-apply-design.md` —
-  implementation not started).
-- **Post-P5 backlog** (`docs/feature-roadmap.md`) — Phase 1 (`read_file_range`,
-  `glob_search`, `view_diff` agent tools) done; Phase 2a (local Ollama
-  auto-discovery on activation) done; Phase 2b (per-role models —
-  `completionModel`/`agentModel`/`inlineEditModel`/`commitMessageModel`,
-  each falling back to `activeModel`) done; Phase 3 (context-window
-  budgeting) done; Phase 4's foundation sub-project (generalizing
-  `budgetContext()` from hardcoded files/hits into a provider-agnostic
-  tier/segment model, groundwork for the six upcoming context providers)
-  done. Phase 4a (`@problems`, `@open`) done. Phase 4b (`@diff`) done.
-  Phase 4c-4e (the remaining context providers — `@terminal`, `@url`,
-  repo-map) not started yet. Remaining phases (5 onward: `multi_edit`,
-  shared config, MCP, true FIM, CLI extension) not started.
+  Telemetry remains out of scope (product philosophy, not a gap).
+- **Post-P5 backlog** (`docs/feature-roadmap.md`) — **all 9 phases done**:
+  Phase 1 (`read_file_range`, `glob_search`, `view_diff` agent tools);
+  Phase 1b (`.xpreiIDEignore`); Phase 2a (local Ollama auto-discovery on
+  activation); Phase 2b (per-role models — `completionModel`/`agentModel`/
+  `inlineEditModel`/`commitMessageModel`, each falling back to
+  `activeModel`); Phase 3 (context-window budgeting via `budgetContext()`);
+  Phase 4 (context providers — `@problems`, `@open`, `@diff`, `@terminal`,
+  `@url`, `@repomap`, all tier-budgeted); Phase 5 (`multi_edit` batched
+  find/replace tool); Phase 6 (shared `~/.xpreiide/config.yaml`, replacing
+  per-host provider settings); Phase 7 (MCP support — servers as both a
+  tool and context source, tools exposed as `mcp__<server>__<tool>`
+  through the same prompt-based protocol as built-in tools); Phase 8
+  (true Ollama FIM via `/api/generate`'s `suffix` param on FIM-capable
+  models, `isFimCapableModel` allowlist, falling back to the `chatStream`
+  hack otherwise); Phase 9 (`extensions/cli`, headless sidecar usage for
+  CI/no-IDE workflows).
+- **Post-feature-roadmap additions** (from a continue.dev competitive gap
+  analysis, 2026-07-26) — all done: end-of-run **batch diff review** for
+  agent file edits (`PendingEditOverlay` buffers writes/deletes in memory
+  per run; edits land on disk only at a pre-terminal/MCP flush or the
+  batch-review UI at `final`/maxSteps-exhaustion — design:
+  `docs/superpowers/specs/2026-07-26-diff-preview-before-apply-design.md`);
+  five quick context mentions — `@currentFile`, `@symbol:<name>`, `@os`,
+  `@commits`, `@search:<text>` (design:
+  `docs/superpowers/specs/2026-07-26-quick-mentions-design.md`); user
+  prompt files (`.xpreiIDE/prompts/*.md` → `/name` slash commands) and
+  glob-scoped rules (`.xpreiIDE/rules/*.md`, optional `globs:`
+  frontmatter, reusing the `.xpreiIDEignore` glob grammar — design:
+  `docs/superpowers/specs/2026-07-26-prompt-files-scoped-rules-design.md`).
 - **Marketplace publish** — not started. Extension is publish-ready
   (`package.json` has publisher/license/icon/categories/keywords,
   `.vscodeignore` and `LICENSE` present, `vscode:prepublish` runs the
@@ -127,7 +148,7 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
 
 ```
 npm install                          # from repo ROOT — links @xprei/core into the extension
-npm test -w @xprei/core              # 97 tests, all pure/headless (node --import tsx --test)
+npm test -w @xprei/core              # 301 tests, all pure/headless (node --import tsx --test)
 npm run typecheck -w @xprei/core     # core tsc --noEmit
 npm run typecheck -w xpreiIDE-ai     # extension tsc --noEmit (resolves @xprei/core via workspace)
 npm run compile -w xpreiIDE-ai       # esbuild → dist/extension.js (inlines @xprei/core from source)
@@ -180,7 +201,9 @@ inlined the core into `dist/extension.js`.
 
 ## Deferred / known gaps
 
-- Indexer uses an exclude-glob, not true `.gitignore` parsing.
+- Indexer respects `.xpreiIDEignore`, a `.gitignore`-lite glob subset (no
+  `!` negation, no nested ignore files, no backslash escaping) — not
+  true `.gitignore` parsing.
 - Brute-force cosine search (fine to a few-k chunks; upgrade to LanceDB/sqlite-vss later).
 - Static per-provider capabilities (no per-model tool detection).
 - Unbounded chat history (no trimming yet).
