@@ -146,6 +146,31 @@ time they're needed (no caching, no reload required):
   agent's `grep`/`glob` tools. Not a full `.gitignore` implementation:
   `!` negation and backslash escaping aren't supported.
 
+## MCP servers
+
+Configure MCP (Model Context Protocol) servers by hand-editing
+`~/.xpreiide/config.yaml` (the same shared config file providers live
+in — see "Add a hosted / custom model" above):
+
+```yaml
+mcpServers:
+  filesystem:
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-filesystem"
+      - /path/to/allowed/directory
+```
+
+Each configured server's tools are automatically available to the agent
+loop (Agent mode only — not Edit mode, and not Plan mode, which has no
+tools at all), named `mcp__<server>__<tool>` in the approval card and
+tool-call log. Every MCP tool call requires approval, the same as any
+other mutating tool — there's no way to know an MCP tool's side effects
+in advance, so none are treated as auto-safe. A server that fails to
+start (bad command, crash during startup) is silently skipped; its
+tools simply won't appear.
+
 ## Inline edit (Cmd-K)
 
 Select code, press **Cmd-K** (Ctrl-K on Windows/Linux), type an instruction. The

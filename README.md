@@ -189,6 +189,9 @@ configuration (runtime workbench).
 - **Ignore file** — a `.xpreiIDEignore` file (`.gitignore`-lite syntax)
   excludes extra paths from the codebase index, on top of the built-in
   exclusions.
+- **MCP servers** — configure MCP servers in the shared config file;
+  their tools become available to the agent loop automatically, named
+  `mcp__<server>__<tool>`.
 
 > Feature availability rolls out per IDE — VS Code has the full set today;
 > JetBrains and Eclipse ship an MVP (chat + BYO-model + agent loop) first, with the
