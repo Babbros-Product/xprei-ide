@@ -3,7 +3,7 @@
 
 import * as vscode from "vscode";
 import { ProviderRegistry } from "../providers/registry";
-import { Agent, AgentEvents, Approver } from "@xprei/core";
+import { Agent, AgentEvents, Approver, BatchDecision, PendingEdit } from "@xprei/core";
 import { VscodeAgentHost } from "./host";
 import { Checkpoint } from "@xprei/core";
 import { Tool, TOOLS } from "@xprei/core";
@@ -22,6 +22,7 @@ export type RequestApproval = (
   summary: string,
   diff?: ApprovalDiff,
 ) => Promise<ApprovalChoice>;
+export type RequestBatch = (entries: PendingEdit[]) => Promise<BatchDecision[]>;
 
 // Edit mode drops shell/exec access — file read/create/edit tools only, no
 // run_terminal or view_diff (both spawn a subprocess) — so "Edit" can't run
@@ -147,6 +148,7 @@ export async function runAgent(
   signal: AbortSignal,
   mode: AgentMode = "agent",
   requestApproval: RequestApproval,
+  requestBatch: RequestBatch,
   mcpManager: McpManager,
   projectRules?: string,
 ): Promise<AgentRun> {
@@ -172,6 +174,7 @@ export async function runAgent(
     onFinal: (t) => post({ type: "agent", kind: "final", text: t }),
     onError: (t) => post({ type: "agent", kind: "error", text: t }),
     onEdit: (path, before, after) => flashAgentEdit(host.cwd, path, before, after),
+    onBatch: (entries) => requestBatch(entries),
     onProtocolError: (attempt, maxAttempts, reason) =>
       post({ type: "agent", kind: "protocolError", text: reason, attempt, maxAttempts }),
   };

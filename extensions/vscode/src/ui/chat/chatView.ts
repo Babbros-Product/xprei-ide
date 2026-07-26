@@ -6,7 +6,7 @@ import { Checkpoint } from "@xprei/core";
 import { AgentMode, ApprovalChoice, ApprovalDiff, runAgent } from "../../agent/runner";
 import { ContextEngine } from "../../context/contextEngine";
 import { parseMentions } from "@xprei/core";
-import { ChatMessage, isAbortError, McpManager, ProviderConfig } from "@xprei/core";
+import { BatchDecision, ChatMessage, isAbortError, McpManager, PendingEdit, ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "../../providers/registry";
 import { uniqueProviderId } from "@xprei/core";
 import { loadProjectRules } from "../../context/projectRules";
@@ -68,6 +68,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private inflight?: AbortController;
   private lastCheckpoint?: Checkpoint;
   private pendingApproval?: (choice: ApprovalChoice) => void;
+  private pendingBatch?: (decisions: BatchDecision[]) => void;
   private webviewReady = false;
   private pendingSeed?: string;
   private sessions: StoredSession[];
@@ -192,6 +193,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       else if (msg?.type === "approvalResponse") {
         this.pendingApproval?.(msg.choice === "approve-all" || msg.choice === "reject" ? msg.choice : "approve");
         this.pendingApproval = undefined;
+      } else if (msg?.type === "batchResponse") {
+        const raw = Array.isArray(msg.decisions) ? msg.decisions : [];
+        const decisions: BatchDecision[] = raw.map((d: Record<string, unknown>) => ({
+          path: String(d?.path ?? ""),
+          accept: !!d?.accept,
+        }));
+        this.pendingBatch?.(decisions);
+        this.pendingBatch = undefined;
       } else if (msg?.type === "copyToClipboard") void vscode.env.clipboard.writeText(String(msg.text ?? ""));
       else if (msg?.type === "insertAtCursor") void insertAtCursor(String(msg.text ?? ""), false);
       else if (msg?.type === "applyEdit") void insertAtCursor(String(msg.text ?? ""), true);
@@ -232,6 +241,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         text: summary,
         before: diff?.before,
         after: diff?.after,
+      });
+    });
+  }
+
+  // Ask the chat webview to review the run's pending file edits as one
+  // batch of per-file diffs — same inline-transcript pattern as
+  // requestApproval, resolving when the webview posts batchResponse.
+  private requestBatch(entries: PendingEdit[]): Promise<BatchDecision[]> {
+    return new Promise((resolve) => {
+      this.pendingBatch = resolve;
+      this.post({
+        type: "agent",
+        kind: "batch",
+        entries: entries.map((e) => ({
+          path: e.path,
+          before: e.before,
+          after: e.after,
+          existed: e.existed,
+          deleted: !!e.deleted,
+        })),
       });
     });
   }
@@ -407,6 +436,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.inflight.signal,
         mode,
         (tool, summary, diff) => this.requestApproval(tool, summary, diff),
+        (entries) => this.requestBatch(entries),
         this.mcpManager,
         rules,
       );
