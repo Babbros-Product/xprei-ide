@@ -139,12 +139,12 @@ docs/                      # specs (superpowers/specs) + multi-ide-plan.md
   glob-scoped rules (`.xpreiIDE/rules/*.md`, optional `globs:`
   frontmatter, reusing the `.xpreiIDEignore` glob grammar — design:
   `docs/superpowers/specs/2026-07-26-prompt-files-scoped-rules-design.md`).
-- **Marketplace publish** — not started. Extension is publish-ready
-  (`package.json` has publisher/license/icon/categories/keywords,
-  `.vscodeignore` and `LICENSE` present, `vscode:prepublish` runs the
-  minified build). Publishing itself (VS Code Marketplace `vsce publish` +
-  Open VSX `ovsx publish`) needs the user's own publisher account/PAT — not
-  done by the agent.
+- **Marketplace publish** — ✅ live. Published as `BABBROSLLP.xpreiIDE-ai`
+  v0.0.1 via `vsce publish` (2026-07-26):
+  https://marketplace.visualstudio.com/items?itemName=BABBROSLLP.xpreiIDE-ai.
+  Open VSX (`ovsx publish`) not done yet — same publish-ready state
+  (`.vscodeignore`/`LICENSE`/`vscode:prepublish` all in place), just
+  needs an Open VSX namespace + token when the user wants to do that too.
 
 ## Working in the monorepo
 

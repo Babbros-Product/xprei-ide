@@ -52,11 +52,15 @@ A **[Babbros](https://xprei.online)** product · [xprei.online](https://xprei.on
 
 ## Visual Studio Code
 
-**Install (from a `.vsix`):**
+**Install from the Marketplace:**
+[BABBROSLLP.xpreiIDE-ai](https://marketplace.visualstudio.com/items?itemName=BABBROSLLP.xpreiIDE-ai) —
+search "xpreiIDE" in VS Code's Extensions panel, or click Install on the
+listing page. (Open VSX listing not published yet.)
+
+**Or install a packaged `.vsix` directly:**
 ```bash
 code --install-extension xpreiIDE-ai-0.0.1.vsix
 ```
-*(Marketplace / Open VSX listing coming soon — until then use the packaged `.vsix`.)*
 
 **Or build it yourself:**
 ```bash
