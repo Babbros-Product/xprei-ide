@@ -81,6 +81,14 @@ body {
   background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
+/* Only set on index.html's New chat / Chat history buttons (JetBrains,
+   Eclipse, standalone-browser) — those hosts have no real multi-session
+   support yet, so the buttons are hidden there. VS Code's own generated
+   HTML never applies this class and is unaffected. */
+.singleSessionHide {
+  display: none;
+}
+
 .addModelBtn {
   flex-shrink: 0;
   font-size: 1em;

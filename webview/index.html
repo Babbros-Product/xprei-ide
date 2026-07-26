@@ -23,8 +23,17 @@
   <div id="chatHeader" class="chatHeader">
     <span class="title">xpreiIDE</span>
     <div class="headerActions">
-      <button type="button" id="newChatBtn" class="iconBtn" title="New chat" aria-label="New chat">+</button>
-      <button type="button" id="historyBtn" class="iconBtn" title="Chat history" aria-label="Chat history">🕓</button>
+      <!-- New chat / Chat history are hidden here (singleSessionHide, see
+           chat.css) — this file is the JetBrains/Eclipse/standalone-browser
+           HTML, and those hosts run one in-memory session with no real
+           multi-session support (see XpreiHostBridge's class doc), so both
+           buttons would be confusing without real functionality behind
+           them. VS Code generates its own separate HTML in chatView.ts,
+           unaffected, and keeps full session history there. The elements
+           stay in the DOM (ids intact) so chat.js's shared event-listener
+           wiring still works — they're just not shown. -->
+      <button type="button" id="newChatBtn" class="iconBtn singleSessionHide" title="New chat" aria-label="New chat">+</button>
+      <button type="button" id="historyBtn" class="iconBtn singleSessionHide" title="Chat history" aria-label="Chat history">🕓</button>
       <button type="button" id="gearBtn" class="iconBtn" title="Model settings" aria-label="Model settings">⚙</button>
     </div>
   </div>
