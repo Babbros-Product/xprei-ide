@@ -177,7 +177,8 @@ configuration (runtime workbench).
   Role...`); any role left unconfigured follows the chat model.
 - **Agentic multi-file coder** — a universal JSON tool protocol that works even on
   smaller open-source models (no reliance on native function-calling), with
-  approval gates and one-click revert.
+  approval gates, one-click revert, and batched multi-edit (several
+  find/replace edits to one file in a single step).
 - **Codebase-aware context** — `@codebase` semantic retrieval, `@file:`
   mentions, `@open` (every open tab), `@problems` (current error/warning
   diagnostics), `@diff` (your current git diff), `@terminal:<command>`
@@ -186,8 +187,14 @@ configuration (runtime workbench).
   are blocked), and `@repomap` (a regex-based overview of exported/public
   symbols across your TypeScript/JavaScript/Python files).
 - **Inline edit** — select code, describe a change, review a red/green diff.
-- **Ghost-text completions**, **commit-message generation**, and right-click quick
-  actions (Explain / Fix / Tests / Comments / Refactor).
+- **Inline chat** — a quick popup question (with or without a selection),
+  no need to open the chat panel.
+- **Ghost-text completions** — real Ollama fill-in-the-middle for
+  FIM-trained code models (codellama, deepseek-coder, qwen2.5-coder, …),
+  chat-based fallback for everything else.
+- **Commit-message generation**, and right-click quick actions (Explain /
+  Fix / Tests / Comments / Refactor — also available as `/slash` commands
+  in chat).
 - **Project rules** — a `.xpreiIDErules` file at your workspace root is injected
   into every prompt.
 - **Ignore file** — a `.xpreiIDEignore` file (`.gitignore`-lite syntax)
