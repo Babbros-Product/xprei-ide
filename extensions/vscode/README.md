@@ -47,18 +47,26 @@ the model later with **xpreiIDE: Select Model**.
 
 ## Add a hosted / custom model
 
-Edit `xpreiIDE.providers` in Settings (JSON):
+Use **xpreiIDE: Add Provider** for guided setup (a preset list plus a
+"Custom…" option), or hand-edit the shared config file at
+`~/.xpreiide/config.yaml` (the same file the IntelliJ and Eclipse
+plugins read, if you use those too):
 
-```json
-[
-  { "id": "ollama-local", "kind": "ollama", "label": "Ollama (local)", "baseUrl": "http://localhost:11434" },
-  { "id": "openai", "kind": "openai-compat", "label": "OpenAI", "baseUrl": "https://api.openai.com/v1" }
-]
+```yaml
+providers:
+  - id: ollama-local
+    kind: ollama
+    label: Ollama (local)
+    baseUrl: http://localhost:11434
+  - id: openai
+    kind: openai-compat
+    label: OpenAI
+    baseUrl: https://api.openai.com/v1
 ```
 
-For `openai-compat` providers, run **xpreiIDE: Set Provider API Key** (stored
-in the OS keychain via SecretStorage, never in settings). `baseUrl` must include
-the API version segment (e.g. `/v1`).
+For `openai-compat` providers, run **xpreiIDE: Set Provider API Key**
+(stored in the OS keychain via SecretStorage, never in the config file).
+`baseUrl` must include the API version segment (e.g. `/v1`).
 
 ## Per-role models
 
