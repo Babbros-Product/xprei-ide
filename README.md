@@ -244,4 +244,4 @@ docs/                       # design specs and the multi-IDE plan
 - **Company:** Babbros
 - **Website:** [xprei.online](https://xprei.online)
 - **Support:** support@xprei.com
-- **License:** MIT (see [`extensions/vscode/LICENSE`](extensions/vscode/LICENSE))
+- **License:** MIT (see [`LICENSE`](LICENSE))
