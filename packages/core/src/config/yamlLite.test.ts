@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseYamlLite, stringifyYamlLite } from "./yamlLite";
+import { parseYamlLite, stringifyYamlLite, YamlMap } from "./yamlLite";
 
 test("parseYamlLite parses a flat mapping of scalars", () => {
   const out = parseYamlLite("activeModel: ollama-local::llama3.1\nembedModel: \"\"\n");
@@ -82,7 +82,7 @@ test("parseYamlLite returns {} for empty content", () => {
 });
 
 test("stringifyYamlLite/parseYamlLite round-trip a representative config document", () => {
-  const value = {
+  const value: YamlMap = {
     providers: [
       { id: "ollama-local", kind: "ollama", label: "Ollama (local)", baseUrl: "http://localhost:11434" },
       { id: "openai", kind: "openai-compat", label: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },

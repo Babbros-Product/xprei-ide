@@ -224,6 +224,7 @@ function stringifyValue(value: YamlValue, indent: number, lines: string[]): void
     }
     return;
   }
+  if (!isPlainObject(value)) return; // stringifyValue is only ever called with an array or a plain object
   for (const [key, v] of Object.entries(value)) {
     if (isPlainObject(v) || Array.isArray(v)) {
       lines.push(`${pad}${key}:`);
