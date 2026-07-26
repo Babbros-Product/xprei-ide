@@ -10,6 +10,7 @@ import { BatchDecision, ChatMessage, isAbortError, McpManager, PendingEdit, Prov
 import { ProviderRegistry } from "../../providers/registry";
 import { uniqueProviderId } from "@xprei/core";
 import { loadProjectRules } from "../../context/projectRules";
+import { loadCustomPrompts } from "../../context/promptFiles";
 import { loadConfig, saveConfig } from "../../config/configStore";
 
 // Plan mode has no file-editing tools at all (plain chat), so the model is
@@ -180,6 +181,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.rehydrate();
         void this.sendModels();
         void this.sendSessions();
+        void this.sendCustomPrompts();
         if (this.pendingSeed !== undefined) {
           this.post({ type: "seed", text: this.pendingSeed });
           this.pendingSeed = undefined;
@@ -282,6 +284,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ type: "models", items });
   }
 
+  private async sendCustomPrompts(): Promise<void> {
+    this.post({ type: "customPrompts", items: await loadCustomPrompts() });
+  }
+
   private async onSelectModel(pointer: string): Promise<void> {
     if (!pointer) return;
     const { config, raw } = await loadConfig();
@@ -377,7 +383,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     this.post({ type: "start" });
 
-    const rules = await loadProjectRules();
+    const active = vscode.window.activeTextEditor;
+    const activeRel = active
+      ? vscode.workspace.asRelativePath(active.document.uri, false).replace(/\\/g, "/")
+      : undefined;
+    const rules = await loadProjectRules(activeRel);
     const messages: ChatMessage[] = [
       { role: "system", content: PLAN_SYSTEM_PROMPT },
       ...(rules ? [{ role: "system" as const, content: `Project instructions:\n${rules}` }] : []),
@@ -428,7 +438,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.inflight = new AbortController();
     this.post({ type: "agent", kind: "start" });
     try {
-      const rules = await loadProjectRules();
+      const active = vscode.window.activeTextEditor;
+    const activeRel = active
+      ? vscode.workspace.asRelativePath(active.document.uri, false).replace(/\\/g, "/")
+      : undefined;
+    const rules = await loadProjectRules(activeRel);
       const run = await runAgent(
         this.registry,
         task,
