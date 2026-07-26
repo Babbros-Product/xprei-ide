@@ -1,28 +1,31 @@
-// First-run convenience: if no chat model is configured yet, quietly probe
-// for a local Ollama daemon and offer one-click setup. Deliberately silent
-// when nothing is found — a machine without Ollama sees no UI at all.
-// Only ever writes xpreiIDE.activeModel; the ollama-local provider config
-// itself already ships as a package.json default.
+// First-run convenience: if no chat model is configured yet, quietly
+// probe for a local Ollama daemon and offer one-click setup.
+// Deliberately silent when nothing is found — a machine without Ollama
+// sees no UI at all. Only ever writes activeModel in the shared config;
+// the ollama-local provider config itself already ships as a
+// config.yaml default (see packages/core/src/config/schema.ts's
+// DEFAULT_CONFIG).
 
 import * as vscode from "vscode";
 import { ProviderConfig } from "@xprei/core";
 import { ProviderRegistry } from "./registry";
+import { loadConfig, saveConfig } from "../config/configStore";
 
 const OLLAMA_URL = "http://localhost:11434";
 const PROBE_TIMEOUT_MS = 1500;
 
 export async function tryAutoDiscoverOllama(registry: ProviderRegistry): Promise<void> {
-  // Everything below reads user-edited settings/config (activeModel check,
+  // Everything below reads user-edited config (activeModel check,
   // findLocalOllamaConfig's c.baseUrl access on unvalidated ProviderConfig
   // objects, etc.) and is called fire-and-forget by the caller. Wrapping the
   // whole body is the outer safety net that keeps the module's "never
   // rejects" contract true by construction, regardless of what throws inside.
   try {
-    const settings = vscode.workspace.getConfiguration("xpreiIDE");
+    const { config } = await loadConfig();
     // Already configured — never probe, never nag.
-    if (settings.get<string>("activeModel", "")) return;
+    if (config.activeModel) return;
 
-    const cfg = findLocalOllamaConfig(registry.getConfigs());
+    const cfg = findLocalOllamaConfig(config.providers);
     // The default config was removed/renamed by the user; don't recreate it.
     if (!cfg) return;
 
@@ -90,16 +93,11 @@ async function setActiveModel(providerId: string, model: string): Promise<void> 
     // activeModel is no longer empty, something else already claimed it —
     // don't clobber it and don't show a success message for a write that
     // didn't happen.
-    const current = vscode.workspace.getConfiguration("xpreiIDE").get<string>("activeModel", "");
-    if (current) return;
+    const { config, raw } = await loadConfig();
+    if (config.activeModel) return;
 
-    await vscode.workspace
-      .getConfiguration("xpreiIDE")
-      .update(
-        "activeModel",
-        ProviderRegistry.formatActive(providerId, model),
-        vscode.ConfigurationTarget.Global,
-      );
+    config.activeModel = ProviderRegistry.formatActive(providerId, model);
+    await saveConfig(config, raw);
   } catch {
     return;
   }
