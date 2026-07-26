@@ -357,11 +357,15 @@
     "/comments": "Add clear, concise comments to this code explaining non-obvious parts. Show the commented version.",
     "/refactor": "Refactor this code for clarity and maintainability, without changing its behavior. Show the refactored version and explain the changes.",
   };
+  // User-defined slash commands from .xpreiIDE/prompts/*.md, pushed by the
+  // extension as a "customPrompts" message; keyed the same way as
+  // SLASH_COMMANDS ("/name" -> template). Built-ins always win a collision.
+  let customPrompts = {};
 
   function expandSlashCommand(raw) {
-    const m = raw.match(/^\s*(\/[a-zA-Z]+)\s*([\s\S]*)$/);
+    const m = raw.match(/^\s*(\/[a-zA-Z0-9-]+)\s*([\s\S]*)$/);
     if (!m) return raw;
-    const template = SLASH_COMMANDS[m[1].toLowerCase()];
+    const template = SLASH_COMMANDS[m[1].toLowerCase()] || customPrompts[m[1].toLowerCase()];
     if (!template) return raw;
     return m[2].trim() ? template + "\n\n" + m[2].trim() : template;
   }
@@ -534,6 +538,14 @@
         break;
       case "sessions":
         renderSessions(msg.items);
+        break;
+      case "customPrompts":
+        customPrompts = {};
+        (Array.isArray(msg.items) ? msg.items : []).forEach((it) => {
+          if (!it || typeof it.name !== "string" || typeof it.template !== "string") return;
+          const key = "/" + it.name;
+          if (!SLASH_COMMANDS[key]) customPrompts[key] = it.template; // built-ins win
+        });
         break;
       case "clearTranscript":
         messagesEl.innerHTML = "";
