@@ -181,12 +181,16 @@ configuration (runtime workbench).
   disk), one-click revert, and batched multi-edit (several find/replace edits
   to one file in a single step).
 - **Codebase-aware context** — `@codebase` semantic retrieval, `@file:`
-  mentions, `@open` (every open tab), `@problems` (current error/warning
-  diagnostics), `@diff` (your current git diff), `@terminal:<command>`
-  (run a command and inline its output, with confirmation), `@url:<address>`
-  (fetch a public URL, HTML stripped to text; private/internal addresses
-  are blocked), and `@repomap` (a regex-based overview of exported/public
-  symbols across your TypeScript/JavaScript/Python files).
+  mentions, `@currentFile` (the active editor's live buffer), `@symbol:<name>`
+  (a function/class's full source via the language server), `@open` (every
+  open tab), `@problems` (current error/warning diagnostics), `@diff` (your
+  current git diff), `@commits` (last 10 commits' metadata),
+  `@terminal:<command>` (run a command and inline its output, with
+  confirmation), `@url:<address>` (fetch a public URL, HTML stripped to
+  text; private/internal addresses are blocked), `@search:<text>` (up to 50
+  workspace hits for an exact substring), `@repomap` (a regex-based overview
+  of exported/public symbols across your TypeScript/JavaScript/Python
+  files), and `@os` (platform/architecture/OS release).
 - **Inline edit** — select code, describe a change, review a red/green diff.
 - **Inline chat** — a quick popup question (with or without a selection),
   no need to open the chat panel.

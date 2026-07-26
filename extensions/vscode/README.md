@@ -170,6 +170,12 @@ need to re-run the rebuild command after every change.
 
 **No index needed** for these — they read live workspace state on demand:
 
+- **`@currentFile`** — inline the active editor's live buffer (including
+  unsaved changes), the same way `@file:` would.
+- **`@symbol:<name>`** — inline a function/class/etc.'s full source, up
+  to 3 best matches, e.g. `@symbol:budgetContext explain this`. Needs a
+  language extension installed for the file it's defined in (uses VS
+  Code's own symbol index) — without one, it contributes nothing.
 - **`@open`** — inline every file you currently have open in an editor
   tab, including background tabs you're not looking at right now.
 - **`@problems`** — inline the current error/warning diagnostics for your
@@ -194,6 +200,13 @@ need to re-run the rebuild command after every change.
   opening every file. It's a quick regex-based summary, not a full
   dependency graph — other languages, and symbols re-exported or aliased
   under a different name, aren't covered.
+- **`@commits`** — inline the last 10 commits' metadata (hash, date,
+  author, subject line) — no diffs, just history for context.
+- **`@search:<text>`** — inline up to 50 workspace hits for an exact,
+  case-insensitive substring, e.g. `@search:TRUNCATION_MARKER where is
+  this used`. Single-token only in v1 — no quoted multi-word queries yet.
+- **`@os`** — inline one line describing your platform, architecture, and
+  OS release, for questions where that matters (build/tooling issues).
 
 You can combine any of these in one message, e.g.
 `@diff @problems review my changes`. If the context you bring in is large,
