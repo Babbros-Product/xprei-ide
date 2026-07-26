@@ -3,10 +3,14 @@
   "displayName": "xpreiIDE AI",
   "description": "Bring-your-own-model AI assistant. Chat with local Ollama or any OpenAI-compatible endpoint.",
   "version": "0.0.1",
-  "publisher": "xpreiIDE",
+  "publisher": "BABBROSLLP",
   "icon": "media/icon.png",
   "license": "MIT",
-  "homepage": "https://xprei.online",
+  "homepage": "https://xprei.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Babbros-Product/xprei-ide"
+  },
   "bugs": {
     "email": "support@xprei.com"
   },
