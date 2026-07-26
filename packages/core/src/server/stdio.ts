@@ -12,11 +12,13 @@ import { OllamaProvider } from "../providers/ollama";
 import { OpenAICompatProvider } from "../providers/openai-compat";
 import { aggregateModels } from "../providers/modelList";
 import { ResolvedModel, SidecarSession } from "./session";
+import { McpServerConfig } from "../mcp/mcpClient";
 
 interface InitProviders {
   providers?: ProviderConfig[];
   // providerId → API key (held in memory only, never persisted by the sidecar).
   apiKeys?: Record<string, string>;
+  mcpServers?: Record<string, McpServerConfig>;
 }
 
 function buildProvider(cfg: ProviderConfig, apiKey: string): Provider {
@@ -28,6 +30,7 @@ function buildProvider(cfg: ProviderConfig, apiKey: string): Provider {
 export function startStdioServer(): void {
   let configs: ProviderConfig[] = [];
   let keys: Record<string, string> = {};
+  let mcpServers: Record<string, McpServerConfig> = {};
 
   const resolveModel = (pointer: string): ResolvedModel | undefined => {
     const [providerId, ...rest] = pointer.split("::");
@@ -41,7 +44,7 @@ export function startStdioServer(): void {
     aggregateModels(configs, async (cfg) => buildProvider(cfg, keys[cfg.id] ?? ""), activePointer);
 
   const emit = (msg: unknown) => process.stdout.write(JSON.stringify(msg) + "\n");
-  const session = new SidecarSession({ emit, resolveModel, listModels });
+  const session = new SidecarSession({ emit, resolveModel, listModels, getMcpServers: () => mcpServers });
 
   const rl = readline.createInterface({ input: process.stdin });
   rl.on("line", (line) => {
@@ -59,6 +62,9 @@ export function startStdioServer(): void {
       if (Array.isArray(msg.params.providers)) configs = msg.params.providers;
       if (msg.params.apiKeys && typeof msg.params.apiKeys === "object") {
         keys = msg.params.apiKeys as Record<string, string>;
+      }
+      if (msg.params.mcpServers && typeof msg.params.mcpServers === "object") {
+        mcpServers = msg.params.mcpServers as Record<string, McpServerConfig>;
       }
     }
     void session.handle(msg as { method: string });

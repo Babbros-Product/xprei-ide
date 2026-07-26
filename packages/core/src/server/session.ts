@@ -16,6 +16,8 @@ import { NodeAgentHost } from "../host/nodeHost";
 import { Agent, AgentEvents, Approver } from "../agent/orchestrator";
 import { Checkpoint } from "../agent/checkpoint";
 import { Tool, TOOLS } from "../agent/tools";
+import { McpManager } from "../mcp/mcpManager";
+import { McpServerConfig } from "../mcp/mcpClient";
 
 export interface ResolvedModel {
   provider: Provider;
@@ -35,6 +37,10 @@ export interface SessionDeps {
   listModels?: (activePointer: string) => Promise<ModelEntry[]>;
   // Build the agent's file/exec host for a workspace root. Defaults to NodeAgentHost.
   makeHost?: (root: string) => AgentHost;
+  // Returns the currently configured MCP servers, if any. Optional so
+  // tests that don't care about MCP tools can omit it — treated as "no
+  // MCP servers configured."
+  getMcpServers?: () => Record<string, McpServerConfig>;
 }
 
 interface Request {
@@ -55,6 +61,7 @@ export class SidecarSession {
   private readonly pendingApprovals = new Map<string, (choice: string) => void>();
   private lastCheckpoint?: Checkpoint;
   private approvalSeq = 0;
+  private readonly mcpManager = new McpManager();
 
   constructor(private readonly deps: SessionDeps) {}
 
@@ -176,13 +183,16 @@ export class SidecarSession {
         this.requestApproval(requestId, tool.name, args),
     };
 
+    const mcpTools =
+      mode === "edit" ? [] : await this.mcpManager.getTools(this.deps.getMcpServers?.() ?? {});
+
     const agent = new Agent({
       provider: resolved.provider,
       model: resolved.model,
       host,
       approver,
       events,
-      tools: mode === "edit" ? EDIT_MODE_TOOLS : TOOLS,
+      tools: mode === "edit" ? EDIT_MODE_TOOLS : [...TOOLS, ...mcpTools],
       projectRules,
       protocolRetries,
     });
