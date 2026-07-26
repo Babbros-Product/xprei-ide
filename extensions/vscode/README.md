@@ -80,6 +80,12 @@ automatically; running the command again on a role you've already
 overridden offers a **"Clear override"** option to revert it back to
 following chat.
 
+FIM-trained code models (codellama, deepseek-coder, qwen2.5-coder,
+codestral, codegemma, granite-code, starcoder, and similar) get genuine
+Ollama fill-in-the-middle completions automatically when selected as the
+completion model — no setup needed. Other models keep using the
+existing chat-based completion approach, unchanged.
+
 ## Architecture
 
 | Layer | Files |
