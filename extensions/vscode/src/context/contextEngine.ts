@@ -4,6 +4,7 @@
 // incrementally as files change.
 
 import * as vscode from "vscode";
+import * as nodeOs from "node:os";
 import { lookup } from "node:dns/promises";
 import { ProviderRegistry } from "../providers/registry";
 import { getGitApi } from "../git/gitApi";
@@ -15,17 +16,21 @@ import {
   extractSymbols,
   FileContext,
   FileSymbols,
+  formatCommits,
   formatDiff,
   formatFiles,
   formatHits,
+  formatOs,
   formatProblems,
   formatRepoMap,
+  formatSearchHits,
   formatTerminal,
   formatUrl,
   isBlockedAddress,
   isSafeUrl,
   MIN_SCORE,
   ProblemInfo,
+  SearchHitLine,
   SegmentTier,
   stripHtml,
   TRUNCATION_MARKER,
@@ -50,6 +55,7 @@ const MAX_URL_BYTES = 500_000;
 const URL_FETCH_TIMEOUT_MS = 10_000;
 const MAX_URL_REDIRECTS = 5;
 const MAX_REPOMAP_FILES = 500;
+const MAX_SEARCH_HITS = 50;
 
 export class ContextEngine {
   private store = new VectorStore();
@@ -170,14 +176,17 @@ export class ContextEngine {
   // contextWindow is the resolved provider's token-count capability — used
   // to size the context block via budgetContext() instead of blindly
   // concatenating everything the mentions resolved to. Tier priority
-  // (highest to lowest): @file: ("break", explicit request) > @problems
-  // ("skip", compact and actionable) > @diff ("break", one segment) >
-  // @terminal ("break", one segment, confirmation-gated) > @url
-  // ("break", one segment, SSRF-checked) > @open ("break", bulkier,
-  // ordered like files) > @repomap ("skip", per-file symbol summaries) >
-  // @codebase hits ("skip", a relevance guess). Every tier is built
-  // unconditionally (even when empty) — budgetContext's return value is
-  // positionally aligned with the input tier array.
+  // (highest to lowest): @file:/@currentFile/@symbol ("break", explicit
+  // request, one shared file tier) > @problems ("skip", compact and
+  // actionable) > @diff ("break", one segment) > @commits ("break", one
+  // segment) > @terminal ("break", one segment, confirmation-gated) >
+  // @url ("break", one segment, SSRF-checked) > @search ("skip", one
+  // segment per hit) > @open ("break", bulkier, ordered like files) >
+  // @repomap ("skip", per-file symbol summaries) > @codebase hits
+  // ("skip", a relevance guess) > @os ("break", ~60 bytes, always fits).
+  // Every tier is built unconditionally (even when empty) —
+  // budgetContext's return value is positionally aligned with the input
+  // tier array.
   async buildContext(mentions: Mentions, contextWindow: number): Promise<string> {
     if (!hasContextRequest(mentions)) return "";
     await this.load();
@@ -193,8 +202,15 @@ export class ContextEngine {
       }
     }
 
+    const currentFile = mentions.currentFile ? this.readCurrentFile() : undefined;
+    const symbolSnippets = mentions.symbol ? await this.readSymbol(mentions.symbol) : [];
+    const commitsText = mentions.commits ? await this.readCommits() : "";
+    const searchHits = mentions.search ? await this.searchWorkspace(mentions.search) : [];
+    const osLine = mentions.os ? this.osInfo() : "";
+
+    const explicitFiles = [...files, ...(currentFile ? [currentFile] : []), ...symbolSnippets];
     const openFiles = mentions.open
-      ? await this.readOpenFiles(new Set(files.map((f) => f.path)))
+      ? await this.readOpenFiles(new Set(explicitFiles.map((f) => f.path)))
       : [];
     const problems = mentions.problems ? this.readProblems() : [];
     const diff = mentions.diff ? await this.readDiff() : "";
@@ -205,7 +221,7 @@ export class ContextEngine {
     const repoFiles = mentions.repomap ? await this.buildRepoMap() : [];
 
     const fileTier: SegmentTier = {
-      segments: files.map((f) => ({ text: f.content, data: f })),
+      segments: explicitFiles.map((f) => ({ text: f.content, data: f })),
       strategy: "break",
     };
     const problemTier: SegmentTier = {
@@ -214,6 +230,10 @@ export class ContextEngine {
     };
     const diffTier: SegmentTier = {
       segments: diff ? [{ text: formatDiff(diff), data: null }] : [],
+      strategy: "break",
+    };
+    const commitsTier: SegmentTier = {
+      segments: commitsText ? [{ text: formatCommits(commitsText), data: null }] : [],
       strategy: "break",
     };
     const terminalTier: SegmentTier = {
@@ -225,6 +245,10 @@ export class ContextEngine {
     const urlTier: SegmentTier = {
       segments: urlContent ? [{ text: formatUrl(mentions.url!, urlContent), data: null }] : [],
       strategy: "break",
+    };
+    const searchTier: SegmentTier = {
+      segments: searchHits.map((h) => ({ text: `// ${h.path}:${h.line}: ${h.text}`, data: h })),
+      strategy: "skip",
     };
     const openTier: SegmentTier = {
       segments: openFiles.map((f) => ({ text: f.content, data: f })),
@@ -242,18 +266,37 @@ export class ContextEngine {
       segments: eligibleHits.map((h) => ({ text: h.chunk.text, data: h })),
       strategy: "skip",
     };
+    const osTier: SegmentTier = {
+      segments: osLine ? [{ text: formatOs(osLine), data: null }] : [],
+      strategy: "break",
+    };
 
     const [
       keptFileSegs,
       keptProblemSegs,
       keptDiffSegs,
+      keptCommitsSegs,
       keptTerminalSegs,
       keptUrlSegs,
+      keptSearchSegs,
       keptOpenSegs,
       keptRepomapSegs,
       keptHitSegs,
+      keptOsSegs,
     ] = budgetContext(
-      [fileTier, problemTier, diffTier, terminalTier, urlTier, openTier, repomapTier, hitTier],
+      [
+        fileTier,
+        problemTier,
+        diffTier,
+        commitsTier,
+        terminalTier,
+        urlTier,
+        searchTier,
+        openTier,
+        repomapTier,
+        hitTier,
+        osTier,
+      ],
       contextWindow,
     );
 
@@ -267,12 +310,15 @@ export class ContextEngine {
     // "break" may have truncated this — always reconstruct from seg.text,
     // not from the original (untruncated) diff string.
     const budgetedDiff: string | undefined = keptDiffSegs[0]?.text;
+    const budgetedCommits: string | undefined = keptCommitsSegs[0]?.text;
     // "break" may have truncated this — always reconstruct from seg.text,
     // not from the original (unbudgeted) command output.
     const budgetedTerminal: string | undefined = keptTerminalSegs[0]?.text;
     // "break" may have truncated this — always reconstruct from seg.text,
     // not from the original (unbudgeted) fetched content.
     const budgetedUrl: string | undefined = keptUrlSegs[0]?.text;
+    // "skip" never truncates — seg.data is the hit, used raw.
+    const budgetedSearch: SearchHitLine[] = keptSearchSegs.map((seg) => seg.data as SearchHitLine);
     const budgetedOpenFiles: FileContext[] = keptOpenSegs.map((seg) => ({
       ...(seg.data as FileContext),
       content: seg.text,
@@ -282,6 +328,7 @@ export class ContextEngine {
     // "skip" never truncates, so seg.text === chunk.text and data can be used raw.
     // If this tier ever becomes "break", reconstruct from seg.text like files do.
     const budgetedHits: SearchHit[] = keptHitSegs.map((seg) => seg.data as SearchHit);
+    const budgetedOs: string | undefined = keptOsSegs[0]?.text;
 
     const allFiles = [...budgetedFiles, ...budgetedOpenFiles];
 
@@ -289,9 +336,12 @@ export class ContextEngine {
       files: allFiles.length ? formatFiles(allFiles, Number.POSITIVE_INFINITY) : undefined,
       problems: budgetedProblems.length ? formatProblems(budgetedProblems) : undefined,
       diff: budgetedDiff,
+      commits: budgetedCommits,
       terminal: budgetedTerminal,
       url: budgetedUrl,
+      search: budgetedSearch.length ? formatSearchHits(mentions.search!, budgetedSearch) : undefined,
       repomap: budgetedRepoFiles.length ? formatRepoMap(budgetedRepoFiles) : undefined,
+      os: budgetedOs,
       retrieved: budgetedHits.length ? formatHits(budgetedHits, Number.NEGATIVE_INFINITY) : undefined,
     });
   }
@@ -613,6 +663,140 @@ export class ContextEngine {
       }
     }
     return out;
+  }
+
+  // @currentFile — the live buffer of the active editor (unsaved
+  // changes included), clipped like any explicit file request.
+  private readCurrentFile(): FileContext | undefined {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return undefined;
+    const raw = editor.document.getText();
+    const content =
+      raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) + TRUNCATION_MARKER : raw;
+    return { path: this.rel(editor.document.uri), content };
+  }
+
+  // @symbol — workspace-symbol lookup, up to 3 best matches; each
+  // symbol's FULL range comes from the document symbol tree (workspace
+  // symbol results may carry name-only ranges), falling back to ±30
+  // lines when no document symbols are available.
+  private async readSymbol(name: string): Promise<FileContext[]> {
+    try {
+      const symbols =
+        (await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
+          "vscode.executeWorkspaceSymbolProvider",
+          name,
+        )) ?? [];
+      const lower = name.toLowerCase();
+      const exact = symbols.filter((s) => s.name.toLowerCase() === lower);
+      const chosen = (exact.length > 0
+        ? exact
+        : symbols.filter((s) => s.name.toLowerCase().startsWith(lower))
+      ).slice(0, 3);
+      const out: FileContext[] = [];
+      for (const sym of chosen) {
+        try {
+          const doc = await vscode.workspace.openTextDocument(sym.location.uri);
+          const range = (await this.fullSymbolRange(doc, sym)) ?? this.fallbackRange(doc, sym);
+          const raw = doc.getText(range);
+          const content =
+            raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) + TRUNCATION_MARKER : raw;
+          out.push({
+            path: `${this.rel(sym.location.uri)}:${range.start.line + 1}-${range.end.line + 1} (${sym.name})`,
+            content,
+          });
+        } catch {
+          // unreadable match — skip it
+        }
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  }
+
+  private async fullSymbolRange(
+    doc: vscode.TextDocument,
+    sym: vscode.SymbolInformation,
+  ): Promise<vscode.Range | undefined> {
+    try {
+      const tree =
+        (await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+          "vscode.executeDocumentSymbolProvider",
+          doc.uri,
+        )) ?? [];
+      const target = sym.location.range.start;
+      const walk = (nodes: vscode.DocumentSymbol[]): vscode.Range | undefined => {
+        for (const n of nodes) {
+          if (!n.range) continue;
+          if (n.name === sym.name && n.range.contains(target)) return n.range;
+          const inner = n.children?.length ? walk(n.children) : undefined;
+          if (inner) return inner;
+        }
+        return undefined;
+      };
+      return walk(tree);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private fallbackRange(doc: vscode.TextDocument, sym: vscode.SymbolInformation): vscode.Range {
+    const start = sym.location.range.start.line;
+    const end = Math.min(doc.lineCount - 1, start + 30);
+    return new vscode.Range(start, 0, end, doc.lineAt(end).text.length);
+  }
+
+  // @commits — last 10 commits' metadata via vscode.git. "" when the
+  // API/log() is unavailable or the repo has no history.
+  private async readCommits(): Promise<string> {
+    try {
+      const api = await getGitApi();
+      const repo = api?.repositories[0];
+      if (!repo?.log) return "";
+      const commits = await repo.log({ maxEntries: 10 });
+      return commits
+        .map((c) => {
+          const date = c.commitDate ? new Date(c.commitDate).toISOString().slice(0, 10) : "";
+          const subject = c.message.split(/\r?\n/)[0];
+          return `${c.hash.slice(0, 7)} ${date} ${c.authorName ?? "?"}: ${subject}`;
+        })
+        .join("\n");
+    } catch {
+      return "";
+    }
+  }
+
+  // @search — exact case-insensitive substring scan, same exclusion
+  // rules as the indexer, capped at MAX_SEARCH_HITS.
+  private async searchWorkspace(query: string): Promise<SearchHitLine[]> {
+    const uris = await vscode.workspace.findFiles("**/*", SCAN_EXCLUDE);
+    const ignorePatterns = await loadIgnorePatterns();
+    const needle = query.toLowerCase();
+    const hits: SearchHitLine[] = [];
+    for (const uri of uris) {
+      if (hits.length >= MAX_SEARCH_HITS) break;
+      const rel = this.rel(uri);
+      if (isExcludedPath(rel, ignorePatterns)) continue;
+      try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if (stat.size > MAX_FILE_BYTES) continue;
+        const raw = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
+        const lines = raw.split(/\r?\n/);
+        for (let i = 0; i < lines.length && hits.length < MAX_SEARCH_HITS; i++) {
+          if (lines[i].toLowerCase().includes(needle)) {
+            hits.push({ path: rel, line: i + 1, text: lines[i].trim().slice(0, 200) });
+          }
+        }
+      } catch {
+        // unreadable — skip
+      }
+    }
+    return hits;
+  }
+
+  private osInfo(): string {
+    return `${process.platform} ${nodeOs.arch()} (release ${nodeOs.release()})`;
   }
 
   private resolveRel(p: string): vscode.Uri | undefined {

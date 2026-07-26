@@ -5,9 +5,17 @@
 
 import * as vscode from "vscode";
 
+export interface GitCommit {
+  hash: string;
+  message: string;
+  authorName?: string;
+  commitDate?: Date;
+}
+
 export interface GitRepository {
   inputBox: { value: string };
   diff(cached?: boolean): Promise<string>;
+  log?(options?: { maxEntries?: number }): Promise<GitCommit[]>;
 }
 export interface GitAPI {
   repositories: GitRepository[];
