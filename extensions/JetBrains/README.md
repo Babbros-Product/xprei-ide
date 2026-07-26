@@ -13,7 +13,7 @@ not working code, until that happens.
 ### What to do first
 
 ```bash
-# from extensions/intellij, with a JDK 17+ on PATH:
+# from extensions/JetBrains, with a JDK 17+ on PATH:
 gradle wrapper --gradle-version 8.10   # generates gradlew/gradlew.bat (not committed — see below)
 ./gradlew build                         # compiles Kotlin, catches real errors
 ./gradlew runIde                        # launches a sandbox IDE with the plugin loaded

@@ -86,7 +86,7 @@ npm run watch          # rebuilds on change
 > written (one plugin covers all IntelliJ-Platform IDEs: IntelliJ IDEA,
 > PyCharm, WebStorm, GoLand, RubyMine, CLion, Rider, …) but has not been built
 > against a real JDK/Gradle yet. See
-> [`extensions/intellij/README.md`](extensions/intellij/README.md) for the full
+> [`extensions/JetBrains/README.md`](extensions/JetBrains/README.md) for the full
 > status and what to check first.
 
 **Build from source (current):**
@@ -95,8 +95,8 @@ npm run watch          # rebuilds on change
 npm install
 npm run build:sidecar -w @xprei/core
 
-cd extensions/intellij
-gradle wrapper --gradle-version 8.10   # generates gradlew (not committed, see extensions/intellij/README.md)
+cd extensions/JetBrains
+gradle wrapper --gradle-version 8.10   # generates gradlew (not committed, see extensions/JetBrains/README.md)
 ./gradlew buildPlugin                   # output: build/distributions/xpreiIDE-*.zip
 ```
 Then in the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → select the
@@ -111,7 +111,7 @@ built `.zip` → restart.
 
 **Dev sandbox:**
 ```bash
-cd extensions/intellij
+cd extensions/JetBrains
 ./gradlew runIde                 # launches a sandbox IDE with the plugin loaded
 ```
 
@@ -206,7 +206,7 @@ configuration (runtime workbench).
 
 ```
 extensions/vscode/          # VS Code extension (package name "xpreiIDE-ai", available today)
-extensions/intellij/        # JetBrains plugin (in development)
+extensions/JetBrains/        # JetBrains plugin (in development)
 extensions/eclipse/         # Eclipse plugin (in development)
 packages/core/              # shared bring-your-own-model + agent core (in development)
 webview/                    # shared chat UI (in development)

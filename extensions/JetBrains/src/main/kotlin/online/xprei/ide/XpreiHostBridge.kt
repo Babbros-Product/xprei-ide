@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 //
 // MVP scope only (per docs/multi-ide-plan.md): chat + BYO-model + agent loop
 // with approvals/revert-adjacent VFS refresh. Deliberately simplified vs the
-// VS Code extension, flagged inline below and in extensions/intellij/README.md:
+// VS Code extension, flagged inline below and in extensions/JetBrains/README.md:
 //   - Single in-memory chat session (no cross-restart persistence, no
 //     multi-session history panel — "newChat"/"switchSession" are minimal).
 //   - insertAtCursor / applyEdit (chat code-block actions) are no-ops.

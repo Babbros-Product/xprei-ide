@@ -151,7 +151,7 @@ uncompiled) IntelliJ/Eclipse plugin scaffolds.**
 One config schema/parser (new `@xprei/core` module) reused across all three
 hosts, replacing three independent implementations of the same
 provider-list concept that exist today: VS Code's `xpreiIDE.providers`
-setting, `extensions/intellij/.../XpreiSettingsState.kt`, and
+setting, `extensions/JetBrains/.../XpreiSettingsState.kt`, and
 `extensions/eclipse/.../XpreiSettings.java`. Sequenced before Phase 7
 because MCP server definitions (command, args, env) need a sane config home
 across all three hosts too — better to land the shared format once than

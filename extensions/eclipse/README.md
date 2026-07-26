@@ -2,7 +2,7 @@
 
 ## ⚠️ Status: written, NOT compiled or run
 
-Same situation as `extensions/intellij`: this was scaffolded on a machine with
+Same situation as `extensions/JetBrains`: this was scaffolded on a machine with
 **no JDK, no Maven** installed (confirmed: `java`, `javac`, `mvn` all absent
 from PATH). Eclipse/Tycho builds are historically more finicky than Gradle
 (target-platform resolution, P2 repository availability, Tycho version
@@ -80,7 +80,7 @@ actually sends and receives.
 
 ## Architecture
 
-Mirrors the IntelliJ plugin (see `extensions/intellij/README.md` for the shared
+Mirrors the IntelliJ plugin (see `extensions/JetBrains/README.md` for the shared
 background) with Eclipse's own platform APIs:
 
 - **`XpreiChatView`** (`ViewPart`) hosts an SWT `Browser` loading the same

@@ -76,9 +76,9 @@ xprei-ide/                      # repo root (was BABBROSIDE)
     vscode/                     # VS Code extension (package name "xpreiIDE-ai") → consumes @xprei/core
       media/                    # GENERATED copy of webview/, gitignored
       scripts/sync-webview.mjs  # copies webview/ -> media/ pre-compile
-    intellij/                   # Kotlin/Gradle — scaffolded, NOT yet compiled
+    JetBrains/                   # Kotlin/Gradle — scaffolded, NOT yet compiled
                                  # (no local JDK/Gradle to verify against — see
-                                 # extensions/intellij/README.md)
+                                 # extensions/JetBrains/README.md)
     eclipse/                    # Java/Tycho — scaffolded, NOT yet compiled
                                  # (no local Maven to verify against — see
                                  # extensions/eclipse/README.md)
@@ -166,7 +166,7 @@ Everything else in the webview (rendering, model picker, approvals) is untouched
 ### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform) — 🚧 scaffolded, **not yet compiled**
 Written on a machine with no local JDK/Gradle (confirmed absent) — everything
 below is code-complete but unverified by an actual build. See
-`extensions/intellij/README.md` for the full caveat, the exact list of
+`extensions/JetBrains/README.md` for the full caveat, the exact list of
 assumptions made without a compiler, and what to check first.
 
 - `XpreiToolWindowFactory` + `XpreiChatPanel`: ToolWindow (anchored right —
@@ -194,7 +194,7 @@ assumptions made without a compiler, and what to check first.
 - **MVP-scope simplifications, deliberately not implemented:** cross-restart
   session persistence (single in-memory session only), `insertAtCursor`/
   `applyEdit` (no-ops), a revert-last-run command (the sidecar RPC exists and
-  is tested; no menu entry yet). Full list in `extensions/intellij/README.md`.
+  is tested; no menu entry yet). Full list in `extensions/JetBrains/README.md`.
 
 ### Phase 3 — Eclipse plugin (Java, Tycho/OSGi) — 🚧 scaffolded, **not yet compiled**
 Written on the same machine, confirmed to also have no local Maven — same

@@ -67,9 +67,9 @@ extensions/vscode/    # the VS Code platform layer — imports @xprei/core
   src/ui/chat/             # chat webview host (chatView.ts)
   media/                   # GENERATED copy of webview/ (gitignored) — see scripts/sync-webview.mjs
   scripts/sync-webview.mjs # copies webview/ -> media/, runs as a `compile` pre-step
-extensions/intellij/       # JetBrains plugin (Kotlin/Gradle) — scaffolded, NOT compiled/run yet
+extensions/JetBrains/       # JetBrains plugin (Kotlin/Gradle) — scaffolded, NOT compiled/run yet
                             # (written with no local JDK/Gradle to verify against — see
-                            # extensions/intellij/README.md before touching this code)
+                            # extensions/JetBrains/README.md before touching this code)
 extensions/eclipse/        # Eclipse plugin (Java/Tycho) — scaffolded, NOT compiled/run yet
                             # (written with no local Maven to verify against — see
                             # extensions/eclipse/README.md before touching this code)
