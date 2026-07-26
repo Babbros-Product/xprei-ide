@@ -1,6 +1,7 @@
-// Provider registry. Reads provider configs from settings, resolves the active
-// model, and constructs the right adapter — injecting API keys from
-// SecretStorage so they never touch plaintext config.
+// Provider registry. Reads provider configs from the shared
+// ~/.xpreiide/config.yaml (see ../config/configStore.ts), resolves the
+// active model, and constructs the right adapter — injecting API keys
+// from SecretStorage so they never touch plaintext config.
 
 import * as vscode from "vscode";
 import {
@@ -10,7 +11,9 @@ import {
   OpenAICompatProvider,
   Provider,
   ProviderConfig,
+  XpreiConfig,
 } from "@xprei/core";
+import { loadConfig, saveConfig } from "../config/configStore";
 
 const SECRET_PREFIX = "xpreiIDE.apiKey.";
 
@@ -19,13 +22,13 @@ export interface ResolvedModel {
   model: string;
 }
 
+type ModelSettingKey = keyof Omit<XpreiConfig, "providers">;
+
 export class ProviderRegistry {
   constructor(private readonly secrets: vscode.SecretStorage) {}
 
-  getConfigs(): ProviderConfig[] {
-    return vscode.workspace
-      .getConfiguration("xpreiIDE")
-      .get<ProviderConfig[]>("providers", []);
+  async getConfigs(): Promise<ProviderConfig[]> {
+    return (await loadConfig()).config.providers;
   }
 
   async build(cfg: ProviderConfig): Promise<Provider> {
@@ -47,51 +50,49 @@ export class ProviderRegistry {
   // Add a provider config (chat settings-panel "Save provider"). Appends to
   // the existing list; caller is responsible for a unique cfg.id.
   async addConfig(cfg: ProviderConfig): Promise<void> {
-    const existing = this.getConfigs();
-    await vscode.workspace
-      .getConfiguration("xpreiIDE")
-      .update("providers", [...existing, cfg], vscode.ConfigurationTarget.Global);
+    const { config, raw } = await loadConfig();
+    config.providers = [...config.providers, cfg];
+    await saveConfig(config, raw);
   }
 
   // Remove a provider config and its stored key (chat settings-panel "Remove").
   async removeConfig(providerId: string): Promise<void> {
-    const remaining = this.getConfigs().filter((c) => c.id !== providerId);
-    await vscode.workspace
-      .getConfiguration("xpreiIDE")
-      .update("providers", remaining, vscode.ConfigurationTarget.Global);
+    const { config, raw } = await loadConfig();
+    config.providers = config.providers.filter((c) => c.id !== providerId);
+    await saveConfig(config, raw);
     await this.deleteApiKey(providerId);
   }
 
-  // Parse the "providerId::model" pointer stored in xpreiIDE.activeModel.
+  // Parse the "providerId::model" pointer stored in the config's activeModel field.
   async resolveActive(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("activeModel");
   }
 
-  // Resolve the embedding model (xpreiIDE.embedModel) for the RAG index.
+  // Resolve the embedding model (embedModel) for the RAG index.
   async resolveEmbed(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("embedModel");
   }
 
-  // Resolve the completion model (xpreiIDE.completionModel), falling back
-  // to the chat model (xpreiIDE.activeModel) when unset.
+  // Resolve the completion model (completionModel), falling back
+  // to the chat model (activeModel) when unset.
   async resolveCompletion(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("completionModel", "activeModel");
   }
 
-  // Resolve the agent-loop model (xpreiIDE.agentModel), falling back to
-  // the chat model (xpreiIDE.activeModel) when unset.
+  // Resolve the agent-loop model (agentModel), falling back to
+  // the chat model (activeModel) when unset.
   async resolveAgent(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("agentModel", "activeModel");
   }
 
-  // Resolve the inline-edit (Cmd/Ctrl+K) model (xpreiIDE.inlineEditModel),
-  // falling back to the chat model (xpreiIDE.activeModel) when unset.
+  // Resolve the inline-edit (Cmd/Ctrl+K) model (inlineEditModel),
+  // falling back to the chat model (activeModel) when unset.
   async resolveInlineEdit(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("inlineEditModel", "activeModel");
   }
 
-  // Resolve the commit-message model (xpreiIDE.commitMessageModel),
-  // falling back to the chat model (xpreiIDE.activeModel) when unset.
+  // Resolve the commit-message model (commitMessageModel),
+  // falling back to the chat model (activeModel) when unset.
   async resolveCommitMessage(): Promise<ResolvedModel | undefined> {
     return this.resolvePointer("commitMessageModel", "activeModel");
   }
@@ -100,31 +101,28 @@ export class ProviderRegistry {
   // panel's model picker. Never throws — a provider that fails to list
   // models is skipped (or falls back to its configured default model).
   async listAllModels(): Promise<ModelEntry[]> {
-    const activePointer = vscode.workspace
-      .getConfiguration("xpreiIDE")
-      .get<string>("activeModel", "");
-    return aggregateModels(this.getConfigs(), (cfg) => this.build(cfg), activePointer);
+    const { config } = await loadConfig();
+    return aggregateModels(config.providers, (cfg) => this.build(cfg), config.activeModel);
   }
 
-  // Reads xpreiIDE.<setting> as a "providerId::model" pointer. If it's
-  // empty/unparseable, OR it parses but points at a provider config that no
-  // longer exists (e.g. removed via "Remove provider"), and fallbackSetting
-  // is given, resolves that setting instead — this is how e.g. an unset (or
-  // stale) completionModel falls back to activeModel. Public: extension.ts's
-  // selectModel() QuickPick previews the effective (fallback-resolved) model
-  // before writing an override.
+  // Reads config.<setting> as a "providerId::model" pointer. If it's
+  // empty/unparseable, OR it parses but points at a provider config that
+  // no longer exists (e.g. removed via "Remove provider"), and
+  // fallbackSetting is given, resolves that setting instead — this is
+  // how e.g. an unset (or stale) completionModel falls back to
+  // activeModel. Public: extension.ts's selectModel() QuickPick previews
+  // the effective (fallback-resolved) model before writing an override.
   async resolvePointer(
-    setting: string,
-    fallbackSetting?: string,
+    setting: ModelSettingKey,
+    fallbackSetting?: ModelSettingKey,
   ): Promise<ResolvedModel | undefined> {
-    const pointer = vscode.workspace
-      .getConfiguration("xpreiIDE")
-      .get<string>(setting, "");
+    const { config } = await loadConfig();
+    const pointer = config[setting];
     const parsed = ProviderRegistry.parsePointer(pointer);
     if (!parsed) {
       return fallbackSetting ? this.resolvePointer(fallbackSetting) : undefined;
     }
-    const cfg = this.getConfigs().find((c) => c.id === parsed.providerId);
+    const cfg = config.providers.find((c) => c.id === parsed.providerId);
     if (!cfg) {
       return fallbackSetting ? this.resolvePointer(fallbackSetting) : undefined;
     }
