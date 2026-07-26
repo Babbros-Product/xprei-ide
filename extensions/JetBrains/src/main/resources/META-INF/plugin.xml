@@ -1,13 +1,13 @@
 <idea-plugin>
   <id>online.xprei.ide</id>
   <name>xpreiIDE</name>
-  <vendor email="support@xprei.com" url="https://xprei.online">Babbros</vendor>
+  <vendor email="support@xprei.com" url="https://xprei.dev">Babbros</vendor>
 
   <description><![CDATA[
     Bring-your-own-model AI coding assistant. Chat and an agentic multi-file
     coder, powered by <b>your</b> models — a local Ollama daemon or any
     OpenAI-compatible endpoint. Same engine as the xpreiIDE VS Code extension,
-    via a shared local core process. A <a href="https://xprei.online">Babbros</a> product.
+    via a shared local core process. A <a href="https://xprei.dev">Babbros</a> product.
   ]]></description>
 
   <depends>com.intellij.modules.platform</depends>

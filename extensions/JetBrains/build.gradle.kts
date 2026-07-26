@@ -33,7 +33,7 @@ intellijPlatform {
         version.set(project.version.toString())
         vendor {
             name.set("Babbros")
-            url.set("https://xprei.online")
+            url.set("https://xprei.dev")
             email.set("support@xprei.com")
         }
         ideaVersion {
