@@ -25,6 +25,7 @@ export * from "./context/ignoreFile";
 export * from "./config/yamlLite";
 export * from "./config/schema";
 export * from "./mcp/mcpClient";
+export * from "./mcp/mcpManager";
 
 // Inline-edit prompt building
 export * from "./edit/prompt";
