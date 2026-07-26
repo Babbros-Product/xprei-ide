@@ -13,6 +13,12 @@
 //                        inline its output; must be the LAST thing in
 //                        the message — everything after "@terminal:" to
 //                        the end of the text is the command verbatim
+//   @currentFile       → inline the active editor's live buffer
+//   @symbol:<name>     → inline a symbol's full source range (up to 3
+//                        matches, workspace-symbol lookup)
+//   @os                → inline one line of platform/arch/OS-release info
+//   @commits           → inline the last 10 commits' metadata
+//   @search:<text>     → inline up to 50 workspace hits for a substring
 // The remaining prose (mentions stripped) is what we embed for retrieval.
 
 export interface Mentions {
@@ -24,6 +30,11 @@ export interface Mentions {
   url: string | undefined;
   repomap: boolean;
   files: string[];
+  currentFile: boolean;
+  os: boolean;
+  commits: boolean;
+  symbol: string | undefined;
+  search: string | undefined;
   // Message with mention tokens removed, used as the retrieval query.
   cleaned: string;
 }
@@ -43,6 +54,11 @@ const PROBLEMS_RE = /(^|\s)@problems\b/gi;
 const DIFF_RE = /(^|\s)@diff\b/gi;
 const URL_RE = /(^|\s)@url:(\S+)/gi;
 const REPOMAP_RE = /(^|\s)@repomap\b/gi;
+const CURRENT_FILE_RE = /(^|\s)@currentFile\b/gi;
+const OS_RE = /(^|\s)@os\b/gi;
+const COMMITS_RE = /(^|\s)@commits\b/gi;
+const SYMBOL_RE = /(^|\s)@symbol:(\S+)/gi;
+const SEARCH_RE = /(^|\s)@search:(\S+)/gi;
 const FILE_RE = /(^|\s)@file:(\S+)/gi;
 // Bare @path shorthand: token containing a slash or a dotted extension.
 const BARE_PATH_RE = /(^|\s)@((?:[\w.\-]+\/)+[\w.\-]+|[\w.\-]+\.[\w]+)/g;
@@ -56,6 +72,11 @@ export function parseMentions(text: string): Mentions {
   let terminalCommand: string | undefined;
   let url: string | undefined;
   let repomap = false;
+  let currentFile = false;
+  let os = false;
+  let commits = false;
+  let symbol: string | undefined;
+  let search: string | undefined;
   let cleaned = text;
 
   cleaned = cleaned.replace(TERMINAL_RE, (_m, pre: string, command: string) => {
@@ -93,6 +114,31 @@ export function parseMentions(text: string): Mentions {
     return pre;
   });
 
+  cleaned = cleaned.replace(CURRENT_FILE_RE, (_m, pre) => {
+    currentFile = true;
+    return pre;
+  });
+
+  cleaned = cleaned.replace(OS_RE, (_m, pre) => {
+    os = true;
+    return pre;
+  });
+
+  cleaned = cleaned.replace(COMMITS_RE, (_m, pre) => {
+    commits = true;
+    return pre;
+  });
+
+  cleaned = cleaned.replace(SYMBOL_RE, (_m, pre: string, name: string) => {
+    symbol = name;
+    return pre;
+  });
+
+  cleaned = cleaned.replace(SEARCH_RE, (_m, pre: string, query: string) => {
+    search = query;
+    return pre;
+  });
+
   cleaned = cleaned.replace(FILE_RE, (_m, pre: string, path: string) => {
     files.push(path);
     return pre;
@@ -112,6 +158,11 @@ export function parseMentions(text: string): Mentions {
     url,
     repomap,
     files: [...new Set(files)],
+    currentFile,
+    os,
+    commits,
+    symbol,
+    search,
     cleaned: cleaned.replace(/\s+/g, " ").trim(),
   };
 }
@@ -125,6 +176,11 @@ export function hasContextRequest(m: Mentions): boolean {
     m.terminalCommand !== undefined ||
     m.url !== undefined ||
     m.repomap ||
-    m.files.length > 0
+    m.files.length > 0 ||
+    m.currentFile ||
+    m.os ||
+    m.commits ||
+    m.symbol !== undefined ||
+    m.search !== undefined
   );
 }

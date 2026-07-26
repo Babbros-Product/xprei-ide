@@ -165,3 +165,49 @@ test("@repomap combines with the other mention types", () => {
   assert.equal(m.url, "https://example.com");
   assert.equal(m.cleaned, "explain this");
 });
+
+test("@currentFile, @os, and @commits set their flags and are stripped", () => {
+  const m = parseMentions("@currentFile @os @commits what is this");
+  assert.equal(m.currentFile, true);
+  assert.equal(m.os, true);
+  assert.equal(m.commits, true);
+  assert.equal(m.cleaned, "what is this");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@symbol:<name> captures the symbol name", () => {
+  const m = parseMentions("explain @symbol:budgetContext to me");
+  assert.equal(m.symbol, "budgetContext");
+  assert.equal(m.cleaned, "explain to me");
+  assert.ok(hasContextRequest(m));
+});
+
+test("@search:<text> captures the query token", () => {
+  const m = parseMentions("@search:TRUNCATION_MARKER where is this used");
+  assert.equal(m.search, "TRUNCATION_MARKER");
+  assert.equal(m.cleaned, "where is this used");
+  assert.ok(hasContextRequest(m));
+});
+
+test("the five quick mentions default to unset", () => {
+  const m = parseMentions("plain question");
+  assert.equal(m.currentFile, false);
+  assert.equal(m.os, false);
+  assert.equal(m.commits, false);
+  assert.equal(m.symbol, undefined);
+  assert.equal(m.search, undefined);
+});
+
+test("quick mentions combine with existing ones", () => {
+  const m = parseMentions("@currentFile @diff @search:foo review");
+  assert.equal(m.currentFile, true);
+  assert.equal(m.diff, true);
+  assert.equal(m.search, "foo");
+  assert.equal(m.cleaned, "review");
+});
+
+test("@symbol does not swallow a trailing @terminal command", () => {
+  const m = parseMentions("@symbol:parseAction check @terminal:npm test");
+  assert.equal(m.symbol, "parseAction");
+  assert.equal(m.terminalCommand, "npm test");
+});
