@@ -9,7 +9,7 @@
   "scripts": {
     "build:cli": "esbuild src/cli.ts --bundle --outfile=dist/cli.cjs --platform=node --format=cjs --target=node18",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/parseArgs.test.ts src/cliConfig.test.ts"
+    "test": "node --import tsx --test src/parseArgs.test.ts src/cliConfig.test.ts src/cli.e2e.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
