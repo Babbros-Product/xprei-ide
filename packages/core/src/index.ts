@@ -27,6 +27,7 @@ export * from "./config/schema";
 export * from "./mcp/mcpClient";
 export * from "./mcp/mcpManager";
 export * from "./providers/fimModels";
+export * from "./agent/pendingEditOverlay";
 
 // Inline-edit prompt building
 export * from "./edit/prompt";
