@@ -1,16 +1,19 @@
 # xpreiIDE — JetBrains plugin
 
-## ⚠️ Status: compiles and packages cleanly (verified 2026-07-26), NOT yet run in a live sandbox IDE
+## ✅ Status: verified live in a sandbox IDE (2026-07-26)
 
 This plugin was originally scaffolded on a machine with no JDK/Gradle
 installed and was unverified. It has since been built for real (JDK 21,
-Gradle 9.6.1): `gradle build` and `gradle buildPlugin` both succeed,
-producing a real installable `xpreiIDE-intellij-0.0.1.zip`. Two real bugs
-were found and fixed in the process (see "Bugs found by the first real
-build" below). What's still unverified: actually loading the plugin in a
-sandbox IDE (`gradle runIde`) and exercising its runtime behavior (JCEF
-webview, PasswordSafe, the sidecar process) — the Kotlin compiles and
-type-checks, but no one has clicked through the chat panel yet.
+Gradle 9.6.1) AND run for real in a sandbox IDE (`gradle runIde`): the
+xpreiIDE tool window opens, a local Ollama provider was configured
+through the **⚙** panel, plain chat streamed a real response, and an
+Agent-mode task ran end-to-end — approval card with a diff, file
+actually written, VFS-refreshed in the editor. Two real bugs were found
+during that live pass and fixed (see "Bugs found by the first live
+sandbox run" below), on top of the two compile-time bugs from the first
+real build (see below that). Still unverified: revert-last-run (no
+command wired up yet — known MVP gap, not a bug) and the PasswordSafe
+secrets path (the tested provider needed no API key).
 
 ### What to do first
 
@@ -18,12 +21,32 @@ type-checks, but no one has clicked through the chat panel yet.
 # from extensions/JetBrains, with a JDK 17+ and Gradle on PATH:
 gradle build                            # compiles Kotlin, packages the plugin
 gradle buildPlugin                      # produces build/distributions/xpreiIDE-intellij-*.zip
-gradle runIde                           # launches a sandbox IDE with the plugin loaded — NOT yet tried
+gradle runIde                           # launches a sandbox IDE with the plugin loaded — verified working
 ```
 
 A Gradle wrapper isn't committed (see below) — either generate one
 (`gradle wrapper --gradle-version 8.10`) or use a system Gradle install
 directly, as above.
+
+### Bugs found by the first live sandbox run (fixed)
+
+1. **Chat/agent hung forever with no error on a bad model pointer.**
+   `XpreiHostBridge.sendRequest("chat.send"/"agent.run", ...)` passed no
+   result callback, so a sidecar-side rejection (`resolveModel` failing —
+   e.g. a stale `activeModel` pointer left over in the shared
+   `~/.xpreiide/config.yaml`) arrived as an RPC error response tied to the
+   request id and was silently dropped: only the async notification events
+   (`chat.done`/`chat.error`/`agent.final`/`agent.error`) ever cleared
+   `inflightRequestId`, so the composer stayed busy forever. Fixed by
+   handling the `{error}` response on both calls, resetting
+   `inflightRequestId` and surfacing a real error message. The Eclipse
+   plugin had the identical bug (same pattern, fixed the same way).
+2. **Header showed "New chat"/"Chat history" icons with no real function
+   behind them** — this plugin runs a single in-memory chat session (see
+   "Deliberate MVP simplifications" below), so those two buttons implied
+   functionality that isn't there yet. Hidden on this host only (shared
+   `webview/index.html`, via a `.singleSessionHide` CSS class) — VS Code's
+   separately-generated header is unaffected and keeps full session history.
 
 ### Bugs found by the first real build (fixed)
 
@@ -40,10 +63,13 @@ directly, as above.
 
 ### Remaining risk (not yet exercised)
 
-1. **API drift for JCEF/PasswordSafe.** Those APIs were grounded against web
-   search results at write time (see inline comments citing what was
-   checked), not exercised at runtime yet — `gradle runIde` is what would
-   catch a stale method name here, and hasn't been run.
+1. **PasswordSafe secrets round-trip.** The live-tested provider (local
+   Ollama) needs no API key, so `XpreiSecrets`' `PasswordSafe.instance`
+   accessor has never actually stored/retrieved a real secret. Test by
+   adding an OpenAI-compatible provider with a key.
+2. **Revert-last-run.** The sidecar's `agent.revert` RPC exists and is
+   tested at the `packages/core` level; this plugin has no menu action
+   wired to it yet (known MVP gap, see "Deliberate MVP simplifications").
 
 ### Why no Gradle wrapper is checked in
 
@@ -57,7 +83,7 @@ yourself once (any system Gradle 8.x works) and it'll generate a real one.
 
 One Kotlin ToolWindow (`XpreiToolWindowFactory` → `XpreiChatPanel`) hosts the
 **same webview** (`webview/index.html` + `chat.js`/`chat.css`/`bridge.js`) the
-VS Code extension and the future Eclipse plugin use, inside a `JBCefBrowser`.
+VS Code extension and the Eclipse plugin use, inside a `JBCefBrowser`.
 `XpreiHostBridge` is the translation layer between two protocols:
 
 - **Webview ↔ host**: the exact message shapes
@@ -105,29 +131,30 @@ IntelliJ's own `PersistentStateComponent` XML storage — it reads/writes
 and the Eclipse plugin use (see
 `docs/superpowers/specs/2026-07-26-phase6-shared-config-design.md`).
 `XpreiYamlLite` (in `XpreiSettingsState.kt`) is a hand-ported copy of
-`packages/core/src/config/yamlLite.ts`'s parser/serializer. Like the rest
-of this plugin, **this change has not been compiled or tested against a
-real JDK/Gradle toolchain** — it was written and reviewed by inspection
-only, following the same "well-researched first draft" status as
-everything else in this file.
+`packages/core/src/config/yamlLite.ts`'s parser/serializer. Compiles and
+has been exercised live: reading the shared config file's `providers` and
+`activeModel` in a real sandbox worked as part of the verified chat/agent
+test pass above.
 
-## Explicit assumptions made without a compiler to check them
+## Assumptions made when this was first written, now confirmed by compile + live run
 
-Listed so a first debugging pass knows exactly where to look:
+Listed for history — all of these compiled cleanly AND were exercised in
+the live sandbox test pass above, except where noted:
 
-- `PasswordSafe.instance` (not `PasswordSafe.getInstance()`) is the correct
-  Kotlin-visible accessor — from a fetched JetBrains support-forum example,
-  not the primary SDK reference doc.
-- `Content.setDisposer(Disposable)` on `com.intellij.ui.content.Content` ties
-  the chat panel's (and its child sidecar process's) disposal to the tool
-  window content's lifecycle.
+- `PasswordSafe.instance` (not `PasswordSafe.getInstance()`) — compiles;
+  **not runtime-exercised** (see "Remaining risk" above, no API-key
+  provider tested yet).
+- `Content.setDisposer(Disposable)` on `com.intellij.ui.content.Content` —
+  ties the chat panel's (and its child sidecar process's) disposal to the
+  tool window content's lifecycle. Compiles; disposal itself wasn't
+  specifically exercised (the sandbox was closed via Exit, not repeatedly
+  opened/closed within one session).
 - `JBCefJSQuery.create(browser as JBCefBrowserBase)` and the
   `cefBrowser.executeJavaScript("...${jsQuery.inject("json")}...")` pattern
-  for injecting a JS-callable bridge function — from the JCEF SDK doc's
-  Java example, adapted to Kotlin without a compile check.
+  for injecting a JS-callable bridge function — **confirmed working live**:
+  this is the exact round-trip that carries every chat/agent message.
 - Gradle IntelliJ Platform Plugin **2.18.1**, `intellijIdeaCommunity("2024.3")`,
-  `sinceBuild = "233"` — current as of a web search at write time; may need
-  bumping.
+  `sinceBuild = "233"` — confirmed working (builds and runs).
 - `sourceSets.main.resources.srcDir(...)` pointing outside the module
   directory (at `../../webview` and `../../packages/core/dist`) to reuse
   those directories directly, mirroring the VS Code extension's
@@ -137,7 +164,7 @@ Listed so a first debugging pass knows exactly where to look:
 
 ```bash
 # from the repo root:
-npm test -w @xprei/core                    # 92 tests, includes the sidecar
+npm test -w @xprei/core                    # 301 tests, includes the sidecar
                                              # protocol this plugin depends on
 npm run build:sidecar -w @xprei/core        # produces dist/sidecar.cjs directly,
                                              # isolates that step from Gradle

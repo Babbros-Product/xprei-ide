@@ -69,9 +69,11 @@ extensions/vscode/    # the VS Code platform layer — imports @xprei/core
   src/ui/chat/             # chat webview host (chatView.ts)
   media/                   # GENERATED copy of webview/ (gitignored) — see scripts/sync-webview.mjs
   scripts/sync-webview.mjs # copies webview/ -> media/, runs as a `compile` pre-step
-extensions/JetBrains/       # JetBrains plugin (Kotlin/Gradle) — compiles and packages
-                            # cleanly (verified 2026-07-26 with a real JDK 21/Gradle
-                            # 9.6.1); NOT yet run in a sandbox IDE — see
+extensions/JetBrains/       # JetBrains plugin (Kotlin/Gradle) — verified LIVE in a
+                            # sandbox IDE (2026-07-26, JDK 21/Gradle 9.6.1): chat +
+                            # agent task + approval + file edit all work. Revert-
+                            # last-run and the PasswordSafe secrets path are the
+                            # remaining unverified pieces — see
                             # extensions/JetBrains/README.md before touching this code
 extensions/eclipse/        # Eclipse plugin (Java/Tycho) — compiles and packages
                             # cleanly (verified 2026-07-26 with a real JDK 21/Maven

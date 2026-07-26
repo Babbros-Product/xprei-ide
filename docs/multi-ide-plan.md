@@ -59,7 +59,7 @@ editor, (4) store secrets in the IDE's secure store, (5) persist config.
 
 ## Target repo layout (monorepo)
 
-Current state (Phases 0-1 done and verified; Phases 2-3 compile/package cleanly, verified 2026-07-26, not yet run in a live IDE):
+Current state (Phases 0-2 done and verified live; Phase 3 compiles/packages cleanly, verified 2026-07-26, not yet run in a live Eclipse instance):
 
 ```
 xprei-ide/                      # repo root (was BABBROSIDE)
@@ -76,9 +76,9 @@ xprei-ide/                      # repo root (was BABBROSIDE)
     vscode/                     # VS Code extension (package name "xpreiIDE-ai") → consumes @xprei/core
       media/                    # GENERATED copy of webview/, gitignored
       scripts/sync-webview.mjs  # copies webview/ -> media/ pre-compile
-    JetBrains/                   # Kotlin/Gradle — compiles & packages (verified 2026-07-26)
-                                 # (real JDK 21/Gradle 9.6.1 build, not yet run in a sandbox IDE — see
-                                 # extensions/JetBrains/README.md)
+    JetBrains/                   # Kotlin/Gradle — verified LIVE in a sandbox IDE (2026-07-26):
+                                 # chat + agent task + approval + file edit all work — see
+                                 # extensions/JetBrains/README.md
     eclipse/                    # Java/Tycho — compiles & packages (verified 2026-07-26)
                                  # (real JDK 21/Maven 3.9.16 build, not yet run live — see
                                  # extensions/eclipse/README.md)
@@ -163,11 +163,16 @@ Everything else in the webview (rendering, model picker, approvals) is untouched
   run that writes a real file through a real approval round-trip.
 - **84 tests** in `@xprei/core` by the end of this phase (+2 harness).
 
-### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform) — 🚧 compiles & packages (verified 2026-07-26), **not yet run in a sandbox IDE**
-Written on a machine with no local JDK/Gradle (confirmed absent) — everything
-below is code-complete but unverified by an actual build. See
-`extensions/JetBrains/README.md` for the full caveat, the exact list of
-assumptions made without a compiler, and what to check first.
+### Phase 2 — IntelliJ plugin (Kotlin, Gradle IntelliJ Platform) — ✅ verified LIVE in a sandbox IDE (2026-07-26)
+Originally written on a machine with no local JDK/Gradle; since built for
+real (JDK 21/Gradle 9.6.1) and run for real via `gradle runIde` — chat
+streamed a response from a local Ollama model, and an Agent-mode task ran
+end-to-end with an approval card and a real file edit. Two runtime bugs
+were found and fixed during that pass (an RPC-response-handling gap that
+caused a silent hang on a failed model resolution, and a UX cleanup
+hiding two single-session-host icons). See `extensions/JetBrains/README.md`
+for the full status, including what's still unverified (revert-last-run,
+the PasswordSafe secrets path).
 
 - `XpreiToolWindowFactory` + `XpreiChatPanel`: ToolWindow (anchored right —
   JetBrains has no core-patch blocker for that placement, unlike VS Code)

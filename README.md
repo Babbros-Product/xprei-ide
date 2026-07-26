@@ -19,16 +19,17 @@ A **[Babbros](https://xprei.online)** product · [xprei.online](https://xprei.on
 | IDE | Status | Install |
 |-----|--------|---------|
 | **Visual Studio Code** | ✅ Available | [Marketplace / `.vsix`](#visual-studio-code) |
-| **JetBrains** (IntelliJ IDEA, PyCharm, WebStorm, GoLand, …) | 🚧 In development | [Build from source](#jetbrains-ides) |
-| **Eclipse** | 🚧 In development | [Build from source](#eclipse) |
+| **JetBrains** (IntelliJ IDEA, PyCharm, WebStorm, GoLand, …) | ✅ Verified in a sandbox IDE | [Build from source](#jetbrains-ides) |
+| **Eclipse** | 🚧 Compiles & packages, not yet run live | [Build from source](#eclipse) |
 | **CLI** (headless, for CI/no-IDE workflows) | ✅ Available | [`extensions/cli`](extensions/cli/README.md) |
 
 > JetBrains and Eclipse plugins share the same engine as the VS Code extension via
 > a bundled local core process — see [`docs/multi-ide-plan.md`](docs/multi-ide-plan.md)
-> for the architecture. The steps below marked *in development* describe the
-> intended flow; the plugins are being built now. The CLI runs the same engine
-> directly in-process (no editor, no bundled sidecar) — see its own README for
-> `xprei agent`/`xprei chat` usage.
+> for the architecture. The JetBrains plugin has been built and run in a real
+> sandbox IDE — chat and an agent task (with approval) both worked. The Eclipse
+> plugin compiles and packages cleanly but hasn't been run in a live Eclipse
+> instance yet. The CLI runs the same engine directly in-process (no editor, no
+> bundled sidecar) — see its own README for `xprei agent`/`xprei chat` usage.
 
 ---
 
@@ -82,12 +83,15 @@ npm run watch          # rebuilds on change
 
 ## JetBrains IDEs
 
-> 🚧 *In development — compiles and packages cleanly, not yet run in a
-> sandbox IDE.* The plugin code is written (one plugin covers all
-> IntelliJ-Platform IDEs: IntelliJ IDEA, PyCharm, WebStorm, GoLand, RubyMine,
-> CLion, Rider, …) and has been built for real against a JDK 21/Gradle 9.6.1
-> toolchain. See [`extensions/JetBrains/README.md`](extensions/JetBrains/README.md)
-> for the full status and what's still unverified.
+> ✅ *Verified in a live sandbox IDE (2026-07-26).* One plugin covers all
+> IntelliJ-Platform IDEs (IntelliJ IDEA, PyCharm, WebStorm, GoLand, RubyMine,
+> CLion, Rider, …). Built for real against a JDK 21/Gradle 9.6.1 toolchain,
+> then run for real via `gradle runIde`: chat streamed a response from a
+> local Ollama model, and an Agent-mode task ran end-to-end with an approval
+> card and a real file edit. See
+> [`extensions/JetBrains/README.md`](extensions/JetBrains/README.md) for the
+> full status and what's still unverified (revert-last-run, the PasswordSafe
+> secrets path).
 
 **Build from source (current):**
 ```bash
