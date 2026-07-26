@@ -1,10 +1,12 @@
-// QuickPick/InputBox wizard for adding a provider without hand-editing JSON.
-// Shared by the "xpreiIDE.addProvider" command and the chat panel's
-// "+ Add provider…" picker entry — one implementation, two entry points.
+// QuickPick/InputBox wizard for adding a provider without hand-editing
+// the config file. Shared by the "xpreiIDE.addProvider" command and the
+// chat panel's "+ Add provider…" picker entry — one implementation, two
+// entry points.
 
 import * as vscode from "vscode";
 import { PRESETS, ProviderConfig, uniqueProviderId } from "@xprei/core";
 import { ProviderRegistry } from "./registry";
+import { configPath, loadConfig, saveConfig } from "../config/configStore";
 
 type AddChoice =
   | { label: string; kind: "custom" }
@@ -44,11 +46,12 @@ export async function runAddProviderFlow(registry: ProviderRegistry): Promise<vo
 
   if (choice.kind === "custom") {
     const action = await vscode.window.showInformationMessage(
-      "Add a provider manually: Settings → xpreiIDE.providers (JSON array).",
-      "Open Settings",
+      `Add a provider manually: edit ${configPath()} (see the 'providers' list).`,
+      "Open Config File",
     );
-    if (action === "Open Settings") {
-      await vscode.commands.executeCommand("workbench.action.openSettingsJson");
+    if (action === "Open Config File") {
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(configPath()));
+      await vscode.window.showTextDocument(doc);
     }
     return;
   }
@@ -70,8 +73,7 @@ export async function runAddProviderFlow(registry: ProviderRegistry): Promise<vo
   });
   if (model === undefined) return;
 
-  const settings = vscode.workspace.getConfiguration("xpreiIDE");
-  const existing = registry.getConfigs();
+  const existing = await registry.getConfigs();
   const id = uniqueProviderId(choice.id, existing.map((c) => c.id));
 
   const cfg: ProviderConfig = {
@@ -83,15 +85,12 @@ export async function runAddProviderFlow(registry: ProviderRegistry): Promise<vo
   };
 
   if (choice.needsKey) await registry.setApiKey(id, apiKey);
-  await settings.update("providers", [...existing, cfg], vscode.ConfigurationTarget.Global);
+  await registry.addConfig(cfg);
 
-  const activePointer = settings.get<string>("activeModel", "");
-  if (!activePointer && model) {
-    await settings.update(
-      "activeModel",
-      ProviderRegistry.formatActive(id, model),
-      vscode.ConfigurationTarget.Global,
-    );
+  const { config, raw } = await loadConfig();
+  if (!config.activeModel && model) {
+    config.activeModel = ProviderRegistry.formatActive(id, model);
+    await saveConfig(config, raw);
   }
 
   vscode.window.showInformationMessage(`xpreiIDE: added provider ${choice.label}.`);
