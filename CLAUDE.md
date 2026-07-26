@@ -168,7 +168,7 @@ inlined the core into `dist/extension.js`.
 - **Provider interface is stable** — new features go through adapters/agent, not by
   changing `Provider`. Agent uses the plain `chatStream`, no interface changes.
 - **Tools call `AgentHost`, never vscode/fs directly** — keeps them unit-testable.
-- **Commits:** author `xpreiIDE <mbsajay1@gmail.com>`; no `Co-Authored-By`
+- **Commits:** author `xpreiIDE <support@xprei.com>`; no `Co-Authored-By`
   footer (dropped 2026-07-25 — do not add it anywhere). Conventional
   prefixes (feat/fix). Line endings: `.gitattributes` forces LF.
 - **User-facing docs stay current.** `extensions/vscode/README.md` is the
