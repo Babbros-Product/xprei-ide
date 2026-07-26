@@ -60,23 +60,47 @@ export function formatRepoMap(files: FileSymbols[]): string {
   return files.map((f) => `// ${f.path}: ${f.symbols.join(", ")}`).join("\n");
 }
 
+export interface SearchHitLine {
+  path: string;
+  line: number;
+  text: string;
+}
+
+export function formatCommits(lines: string): string {
+  return `// Recent commits:\n${lines}`;
+}
+
+export function formatSearchHits(query: string, hits: SearchHitLine[]): string {
+  return [`// Search results for "${query}":`, ...hits.map((h) => `// ${h.path}:${h.line}: ${h.text}`)].join("\n");
+}
+
+export function formatOs(info: string): string {
+  return `// OS: ${info}`;
+}
+
 // Assemble the final context message the chat prepends before the user turn.
 export function buildContextMessage(parts: {
   retrieved?: string;
   files?: string;
   problems?: string;
   diff?: string;
+  commits?: string;
   terminal?: string;
   url?: string;
+  search?: string;
   repomap?: string;
+  os?: string;
 }): string {
   const sections: string[] = [];
   if (parts.files) sections.push(parts.files);
   if (parts.problems) sections.push(parts.problems);
   if (parts.diff) sections.push(parts.diff);
+  if (parts.commits) sections.push(parts.commits);
   if (parts.terminal) sections.push(parts.terminal);
   if (parts.url) sections.push(parts.url);
+  if (parts.search) sections.push(parts.search);
   if (parts.repomap) sections.push(parts.repomap);
+  if (parts.os) sections.push(parts.os);
   if (parts.retrieved) sections.push("// Relevant code from the workspace:\n" + parts.retrieved);
   if (sections.length === 0) return "";
   return (

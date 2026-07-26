@@ -3,14 +3,18 @@ import { test } from "node:test";
 import {
   buildContextMessage,
   FileContext,
+  formatCommits,
   formatDiff,
   formatFiles,
   formatHits,
+  formatOs,
   formatProblems,
   formatRepoMap,
+  formatSearchHits,
   formatTerminal,
   formatUrl,
   ProblemInfo,
+  SearchHitLine,
 } from "./retrieval";
 import { FileSymbols } from "./repomap";
 import { SearchHit } from "./vectorstore";
@@ -224,5 +228,37 @@ test("buildContextMessage with only repomap present produces just the repomap se
   assert.equal(
     out,
     "The user referenced workspace context. Use it to answer.\n\n// a.ts: foo, Bar",
+  );
+});
+
+test("formatCommits prepends the header", () => {
+  assert.equal(formatCommits("abc1234 me 2026-07-26 fix"), "// Recent commits:\nabc1234 me 2026-07-26 fix");
+});
+
+test("formatSearchHits renders a header plus one line per hit", () => {
+  const hits: SearchHitLine[] = [
+    { path: "a.ts", line: 3, text: "const x = 1;" },
+    { path: "b.ts", line: 9, text: "let y;" },
+  ];
+  assert.equal(
+    formatSearchHits("x", hits),
+    '// Search results for "x":\n// a.ts:3: const x = 1;\n// b.ts:9: let y;',
+  );
+});
+
+test("formatOs wraps the info line", () => {
+  assert.equal(formatOs("win32 x64"), "// OS: win32 x64");
+});
+
+test("buildContextMessage assembles all ten sections in the locked order", () => {
+  const out = buildContextMessage({
+    files: "F", problems: "P", diff: "D", commits: "C", terminal: "T",
+    url: "U", search: "S", repomap: "R", os: "O",
+    retrieved: "X",
+  });
+  assert.equal(
+    out,
+    "The user referenced workspace context. Use it to answer.\n\n" +
+      "F\n\nP\n\nD\n\nC\n\nT\n\nU\n\nS\n\nR\n\nO\n\n// Relevant code from the workspace:\nX",
   );
 });
